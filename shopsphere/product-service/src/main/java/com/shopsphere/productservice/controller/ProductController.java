@@ -4,21 +4,24 @@ import com.shopsphere.productservice.dto.ProductRequest;
 import com.shopsphere.productservice.dto.ProductResponse;
 import com.shopsphere.productservice.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
-@Tag(name = "Products", description = "Product CRUD APIs")
+@Tag(name = "Products", description = "Product CRUD, search, and filtering APIs")
 public class ProductController {
 
     private final ProductService productService;
@@ -33,9 +36,22 @@ public class ProductController {
     }
 
     @GetMapping
-    @Operation(summary = "List all products (paginated)")
-    public Page<ProductResponse> list(Pageable pageable) {
-        return productService.list(pageable);
+    @Operation(summary = "Search and list products with pagination and filters")
+    public Page<ProductResponse> search(
+            @Parameter(description = "Partial, case-insensitive name match")
+            @RequestParam(required = false) String name,
+            @Parameter(description = "Filter by category id")
+            @RequestParam(required = false) Long categoryId,
+            @Parameter(description = "Minimum price (inclusive)")
+            @RequestParam(required = false) BigDecimal minPrice,
+            @Parameter(description = "Maximum price (inclusive)")
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @Parameter(description = "Filter by active flag")
+            @RequestParam(required = false) Boolean active,
+            @Parameter(description = "true = stock > 0, false = stock == 0")
+            @RequestParam(required = false) Boolean inStock,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return productService.search(name, categoryId, minPrice, maxPrice, active, inStock, pageable);
     }
 
     @GetMapping("/{id}")

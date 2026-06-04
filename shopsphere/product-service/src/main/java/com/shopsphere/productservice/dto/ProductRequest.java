@@ -26,8 +26,7 @@ public class ProductRequest {
     @Digits(integer = 10, fraction = 2, message = "Price must have at most 2 decimal places")
     private BigDecimal price;
 
-    @Size(max = 100, message = "Category must be at most 100 characters")
-    private String category;
+    private Long categoryId;
 
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock quantity cannot be negative")
