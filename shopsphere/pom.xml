@@ -26,6 +26,7 @@
         <spring-cloud.version>2023.0.4</spring-cloud.version>
         <springdoc.version>2.6.0</springdoc.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <lombok.version>1.18.38</lombok.version>
         <testcontainers.version>1.20.3</testcontainers.version>
     </properties>
 
