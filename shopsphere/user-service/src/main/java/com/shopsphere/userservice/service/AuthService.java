@@ -1,11 +1,14 @@
 package com.shopsphere.userservice.service;
 
 import com.shopsphere.userservice.dto.AuthResponse;
+import com.shopsphere.userservice.dto.LoginRequest;
 import com.shopsphere.userservice.dto.RegisterRequest;
 import com.shopsphere.userservice.entity.Role;
 import com.shopsphere.userservice.entity.User;
 import com.shopsphere.userservice.exception.DuplicateEmailException;
+import com.shopsphere.userservice.exception.InvalidCredentialsException;
 import com.shopsphere.userservice.repository.UserRepository;
+import com.shopsphere.userservice.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -34,14 +38,36 @@ public class AuthService {
                 .build();
 
         User saved = userRepository.save(user);
+        String token = jwtUtil.generateToken(saved.getEmail(), saved.getId(), saved.getRole().name());
 
+        return toAuthResponse(saved, token);
+    }
+
+    @Transactional(readOnly = true)
+    public AuthResponse login(LoginRequest request) {
+        User user = userRepository.findByEmailIgnoreCase(request.getEmail())
+                .orElseThrow(InvalidCredentialsException::new);
+
+        if (!Boolean.TRUE.equals(user.getEnabled())) {
+            throw new InvalidCredentialsException();
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new InvalidCredentialsException();
+        }
+
+        String token = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole().name());
+        return toAuthResponse(user, token);
+    }
+
+    private AuthResponse toAuthResponse(User user, String token) {
         return AuthResponse.builder()
-                .userId(saved.getId())
-                .email(saved.getEmail())
-                .firstName(saved.getFirstName())
-                .lastName(saved.getLastName())
-                .role(saved.getRole())
-                .token(null)
+                .userId(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .role(user.getRole())
+                .token(token)
                 .build();
     }
 }
