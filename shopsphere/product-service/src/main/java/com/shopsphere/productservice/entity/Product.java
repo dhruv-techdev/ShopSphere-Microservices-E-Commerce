@@ -14,7 +14,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "products", indexes = {
-        @Index(name = "idx_product_category", columnList = "category"),
+        @Index(name = "idx_product_category", columnList = "category_id"),
         @Index(name = "idx_product_name", columnList = "name")
 })
 @Getter
@@ -37,8 +37,9 @@ public class Product {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
-    @Column(length = 100)
-    private String category;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", foreignKey = @ForeignKey(name = "fk_product_category"))
+    private Category category;
 
     @Column(nullable = false)
     private Integer stockQuantity;
