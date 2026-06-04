@@ -15,7 +15,7 @@ import java.util.Map;
 public class HealthController {
 
     @GetMapping("/health")
-    @Operation(summary = "Health check", description = "Returns service status and timestamp")
+    @Operation(summary = "Health check", description = "Public endpoint. Returns service status and current server timestamp.")
     public Map<String, Object> health() {
         return Map.of(
                 "service", "product-service",
