@@ -14,7 +14,9 @@ spring:
 
 app:
   cart:
-    ttl-hours: ${CART_TTL_HOURS:168}  # 7 days — carts auto-expire
+    ttl-hours: ${CART_TTL_HOURS:168}
+  product-service:
+    base-url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
 
 management:
   endpoints:
