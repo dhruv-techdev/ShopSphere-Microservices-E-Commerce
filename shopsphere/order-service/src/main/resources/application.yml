@@ -29,6 +29,8 @@ app:
     base-url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
   cart-service:
     base-url: ${CART_SERVICE_URL:http://localhost:8083}
+  inventory-service:
+    base-url: ${INVENTORY_SERVICE_URL:http://localhost:8085}
 
 management:
   endpoints:

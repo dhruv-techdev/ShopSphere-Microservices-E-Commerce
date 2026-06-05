@@ -1,5 +1,7 @@
 package com.shopsphere.inventoryservice.service;
 
+import com.shopsphere.inventoryservice.dto.CheckAvailabilityRequest;
+import com.shopsphere.inventoryservice.dto.CheckAvailabilityResponse;
 import com.shopsphere.inventoryservice.dto.InitInventoryRequest;
 import com.shopsphere.inventoryservice.dto.StockResponse;
 import com.shopsphere.inventoryservice.dto.StockUpdateRequest;
@@ -14,7 +16,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +51,7 @@ public class InventoryService {
     }
 
     /* ---------------------------------------------------------------- */
-    /* ST8 — Stock check                                                 */
+    /* Single-product stock check                                        */
     /* ---------------------------------------------------------------- */
 
     @Transactional(readOnly = true)
@@ -65,12 +69,64 @@ public class InventoryService {
     }
 
     /* ---------------------------------------------------------------- */
-    /* ST7 — Stock update                                                */
+    /* US16 — Batch availability check                                   */
+    /* ---------------------------------------------------------------- */
+
+    @Transactional(readOnly = true)
+    public CheckAvailabilityResponse checkAvailability(CheckAvailabilityRequest request) {
+        // Single DB query for all product IDs — avoids N round-trips
+        List<Long> productIds = request.getItems().stream()
+                .map(CheckAvailabilityRequest.Item::getProductId)
+                .toList();
+
+        Map<Long, Inventory> byProductId = new HashMap<>();
+        inventoryRepository.findByProductIdIn(productIds).forEach(inv ->
+                byProductId.put(inv.getProductId(), inv));
+
+        boolean allAvailable = true;
+        List<CheckAvailabilityResponse.ItemAvailability> results =
+                new java.util.ArrayList<>(request.getItems().size());
+
+        for (CheckAvailabilityRequest.Item item : request.getItems()) {
+            Inventory inv = byProductId.get(item.getProductId());
+
+            if (inv == null) {
+                allAvailable = false;
+                results.add(CheckAvailabilityResponse.ItemAvailability.builder()
+                        .productId(item.getProductId())
+                        .requestedQuantity(item.getQuantity())
+                        .sellableQuantity(0)
+                        .available(false)
+                        .reason("NO_INVENTORY_RECORD")
+                        .build());
+                continue;
+            }
+
+            int sellable = inv.sellable();
+            boolean ok = sellable >= item.getQuantity();
+            if (!ok) allAvailable = false;
+
+            results.add(CheckAvailabilityResponse.ItemAvailability.builder()
+                    .productId(item.getProductId())
+                    .requestedQuantity(item.getQuantity())
+                    .sellableQuantity(sellable)
+                    .available(ok)
+                    .reason(ok ? "OK" : "INSUFFICIENT_STOCK")
+                    .build());
+        }
+
+        return CheckAvailabilityResponse.builder()
+                .allAvailable(allAvailable)
+                .items(results)
+                .build();
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Stock update                                                      */
     /* ---------------------------------------------------------------- */
 
     @Transactional
     public StockResponse updateStock(Long productId, StockUpdateRequest request) {
-        // Pessimistic lock — guarantees no other transaction modifies this row until we commit
         Inventory inv = inventoryRepository.findByProductIdForUpdate(productId)
                 .orElseThrow(() -> new InventoryNotFoundException(productId));
 
@@ -81,7 +137,6 @@ public class InventoryService {
             case DECREMENT -> {
                 int candidate = before - request.getQuantity();
                 if (candidate < inv.getReservedQuantity()) {
-                    // Would push available below what's reserved — refuse
                     throw new InsufficientStockException(
                             productId, request.getQuantity(),
                             before - inv.getReservedQuantity());
