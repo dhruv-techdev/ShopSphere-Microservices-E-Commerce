@@ -15,8 +15,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ProductNotFoundException.class)
-    public ResponseEntity<ApiError> handleProductNotFound(ProductNotFoundException ex, HttpServletRequest req) {
+    @ExceptionHandler({
+            ProductNotFoundException.class,
+            CartNotFoundException.class,
+            CartItemNotFoundException.class
+    })
+    public ResponseEntity<ApiError> handleNotFound(RuntimeException ex, HttpServletRequest req) {
         return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), req, null);
     }
 
@@ -27,7 +31,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ProductLookupException.class)
     public ResponseEntity<ApiError> handleProductLookup(ProductLookupException ex, HttpServletRequest req) {
-        // Upstream service issue — return 502 Bad Gateway
         return build(HttpStatus.BAD_GATEWAY, "Bad Gateway", ex.getMessage(), req, null);
     }
 
