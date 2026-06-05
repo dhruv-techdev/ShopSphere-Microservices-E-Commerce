@@ -8,14 +8,19 @@ import com.shopsphere.orderservice.client.ProductDto;
 import com.shopsphere.orderservice.dto.CreateOrderRequest;
 import com.shopsphere.orderservice.dto.OrderItemResponse;
 import com.shopsphere.orderservice.dto.OrderResponse;
+import com.shopsphere.orderservice.dto.OrderSummaryResponse;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.entity.OrderItem;
 import com.shopsphere.orderservice.entity.OrderStatus;
 import com.shopsphere.orderservice.exception.InsufficientStockException;
+import com.shopsphere.orderservice.exception.OrderAccessDeniedException;
+import com.shopsphere.orderservice.exception.OrderNotFoundException;
 import com.shopsphere.orderservice.exception.ProductUnavailableException;
 import com.shopsphere.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,13 +35,15 @@ public class OrderService {
     private final CartClient cartClient;
     private final ProductClient productClient;
 
+    /* ---------------------------------------------------------------- */
+    /* Create order (US13)                                               */
+    /* ---------------------------------------------------------------- */
+
     @Transactional
     public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
-        // 1. ST3 — Fetch cart (also handles ST4 — empty cart throws EmptyCartException)
         CartDto cart = cartClient.getCart(userId);
         log.debug("Fetched cart for user {} with {} items", userId, cart.getItems().size());
 
-        // 2. ST6 — Build order shell
         Order order = Order.builder()
                 .userId(userId)
                 .status(OrderStatus.PENDING_PAYMENT)
@@ -45,7 +52,6 @@ public class OrderService {
         BigDecimal computedTotal = BigDecimal.ZERO;
         int computedItemCount = 0;
 
-        // 3. ST5 + ST7 — For each cart line, re-validate product and snapshot line
         for (CartItemDto cartItem : cart.getItems()) {
             ProductDto product = productClient.fetchProduct(cartItem.getProductId());
 
@@ -60,7 +66,6 @@ public class OrderService {
                         product.getName(), cartItem.getQuantity(), product.getStockQuantity());
             }
 
-            // Snapshot the *latest* price from product-service, not the cart's (cart can be stale)
             BigDecimal unitPrice = product.getPrice();
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
 
@@ -78,7 +83,6 @@ public class OrderService {
             computedItemCount += cartItem.getQuantity();
         }
 
-        // 4. ST8 — Persist the order in PENDING_PAYMENT
         order.setTotalAmount(computedTotal);
         order.setItemCount(computedItemCount);
 
@@ -86,7 +90,6 @@ public class OrderService {
         log.info("Created order {} for user {} (total={}, items={})",
                 saved.getId(), userId, computedTotal, computedItemCount);
 
-        // 5. ST9 — Clear cart (best-effort; order is already committed)
         try {
             cartClient.clearCart(userId);
         } catch (Exception ex) {
@@ -96,6 +99,44 @@ public class OrderService {
 
         return toResponse(saved);
     }
+
+    /* ---------------------------------------------------------------- */
+    /* ST1 + ST2 — Order history for a user                              */
+    /* ---------------------------------------------------------------- */
+
+    @Transactional(readOnly = true)
+    public Page<OrderSummaryResponse> getMyOrders(Long userId, OrderStatus status, Pageable pageable) {
+        Page<Order> page = (status == null)
+                ? orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+                : orderRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status, pageable);
+
+        return page.map(this::toSummary);
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* ST3 + ST4 + ST5 — Order details by id, with ownership check       */
+    /* ---------------------------------------------------------------- */
+
+    @Transactional(readOnly = true)
+    public OrderResponse getOrderById(Long userId, Long orderId) {
+        Order order = orderRepository.findWithItemsById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (!order.getUserId().equals(userId)) {
+            // Deliberately the same shape as not-found from an attacker's perspective.
+            // We log the real reason, but the public response is "Forbidden", not
+            // "Order X belongs to user Y" — that would leak ownership info.
+            log.warn("User {} attempted to access order {} owned by user {}",
+                    userId, orderId, order.getUserId());
+            throw new OrderAccessDeniedException(orderId);
+        }
+
+        return toResponse(order);
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Mappers                                                           */
+    /* ---------------------------------------------------------------- */
 
     public OrderResponse toResponse(Order order) {
         return OrderResponse.builder()
@@ -116,6 +157,16 @@ public class OrderService {
                                 .lineTotal(item.getLineTotal())
                                 .build())
                         .toList())
+                .build();
+    }
+
+    public OrderSummaryResponse toSummary(Order order) {
+        return OrderSummaryResponse.builder()
+                .id(order.getId())
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .itemCount(order.getItemCount())
+                .createdAt(order.getCreatedAt())
                 .build();
     }
 }
