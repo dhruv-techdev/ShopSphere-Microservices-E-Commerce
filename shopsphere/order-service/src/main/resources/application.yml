@@ -24,6 +24,12 @@ spring:
         default_schema: shopsphere_orders
     open-in-view: false
 
+app:
+  product-service:
+    base-url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+  cart-service:
+    base-url: ${CART_SERVICE_URL:http://localhost:8083}
+
 management:
   endpoints:
     web:
