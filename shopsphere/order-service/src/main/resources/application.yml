@@ -24,6 +24,27 @@ spring:
         default_schema: shopsphere_orders
     open-in-view: false
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all                       # wait for all in-sync replicas — strongest durability
+      retries: 3
+      properties:
+        enable.idempotence: true     # no duplicate writes on retry
+        max.in.flight.requests.per.connection: 5
+        linger.ms: 5                  # batch writes within 5ms — small latency, much better throughput
+    consumer:
+      group-id: order-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "com.shopsphere.common.events"
+        spring.json.use.type.headers: false
+
 app:
   product-service:
     base-url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
