@@ -1,8 +1,9 @@
-package com.shopsphere.orderservice.exception;
+package com.shopsphere.inventoryservice.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,29 +16,26 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({ProductNotFoundException.class, OrderNotFoundException.class})
-    public ResponseEntity<ApiError> handleNotFound(RuntimeException ex, HttpServletRequest req) {
+    @ExceptionHandler(InventoryNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(InventoryNotFoundException ex, HttpServletRequest req) {
         return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), req, null);
     }
 
-    @ExceptionHandler(OrderAccessDeniedException.class)
-    public ResponseEntity<ApiError> handleForbidden(OrderAccessDeniedException ex, HttpServletRequest req) {
-        return build(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), req, null);
-    }
-
-    @ExceptionHandler(EmptyCartException.class)
-    public ResponseEntity<ApiError> handleEmptyCart(EmptyCartException ex, HttpServletRequest req) {
-        return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req, null);
-    }
-
-    @ExceptionHandler({ProductUnavailableException.class, InsufficientStockException.class})
-    public ResponseEntity<ApiError> handleConflict(RuntimeException ex, HttpServletRequest req) {
+    @ExceptionHandler(InventoryAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleConflict(InventoryAlreadyExistsException ex, HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req, null);
     }
 
-    @ExceptionHandler({CartUnavailableException.class, ProductLookupException.class})
-    public ResponseEntity<ApiError> handleUpstream(RuntimeException ex, HttpServletRequest req) {
-        return build(HttpStatus.BAD_GATEWAY, "Bad Gateway", ex.getMessage(), req, null);
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ApiError> handleInsufficient(InsufficientStockException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req, null);
+    }
+
+    /** Optimistic-lock retry signal — surface as 409 so clients can retry. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLock(ObjectOptimisticLockingFailureException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "Conflict",
+                "Inventory was modified concurrently — please retry", req, null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
