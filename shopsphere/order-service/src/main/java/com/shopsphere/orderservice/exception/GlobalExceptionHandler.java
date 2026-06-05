@@ -35,7 +35,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req, null);
     }
 
-    @ExceptionHandler({CartUnavailableException.class, ProductLookupException.class})
+    @ExceptionHandler({
+            CartUnavailableException.class,
+            ProductLookupException.class,
+            InventoryUnavailableException.class
+    })
     public ResponseEntity<ApiError> handleUpstream(RuntimeException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_GATEWAY, "Bad Gateway", ex.getMessage(), req, null);
     }

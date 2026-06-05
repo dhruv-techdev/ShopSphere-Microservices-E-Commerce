@@ -3,6 +3,7 @@ package com.shopsphere.orderservice.service;
 import com.shopsphere.orderservice.client.CartClient;
 import com.shopsphere.orderservice.client.CartDto;
 import com.shopsphere.orderservice.client.CartItemDto;
+import com.shopsphere.orderservice.client.InventoryClient;
 import com.shopsphere.orderservice.client.ProductClient;
 import com.shopsphere.orderservice.client.ProductDto;
 import com.shopsphere.orderservice.dto.CreateOrderRequest;
@@ -25,6 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -34,16 +38,51 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartClient cartClient;
     private final ProductClient productClient;
+    private final InventoryClient inventoryClient;
 
     /* ---------------------------------------------------------------- */
-    /* Create order (US13)                                               */
+    /* Create order                                                      */
     /* ---------------------------------------------------------------- */
 
     @Transactional
     public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
+        // 1. Fetch cart
         CartDto cart = cartClient.getCart(userId);
         log.debug("Fetched cart for user {} with {} items", userId, cart.getItems().size());
 
+        // 2. US16 — Batch availability check against inventory-service (authoritative)
+        List<InventoryClient.Item> stockItems = cart.getItems().stream()
+                .map(ci -> new InventoryClient.Item(ci.getProductId(), ci.getQuantity()))
+                .toList();
+        InventoryClient.AvailabilityResult availability = inventoryClient.checkAvailability(stockItems);
+
+        if (!availability.allAvailable()) {
+            // Find the first short item to put in the error message
+            InventoryClient.ItemAvailability firstShort = availability.items().stream()
+                    .filter(i -> !i.available())
+                    .findFirst()
+                    .orElseThrow();
+            log.warn("Order rejected for user {} — product {} short by {}",
+                    userId, firstShort.productId(),
+                    firstShort.requestedQuantity() - firstShort.sellableQuantity());
+            throw new InsufficientStockException(
+                    "product " + firstShort.productId(),
+                    firstShort.requestedQuantity(),
+                    firstShort.sellableQuantity());
+        }
+
+        // 3. For each cart line, fetch product (for active-flag + price snapshot)
+        Map<Long, ProductDto> productById = new HashMap<>();
+        for (CartItemDto cartItem : cart.getItems()) {
+            ProductDto product = productClient.fetchProduct(cartItem.getProductId());
+            if (Boolean.FALSE.equals(product.getActive())) {
+                throw new ProductUnavailableException(
+                        "Product '" + product.getName() + "' is no longer available");
+            }
+            productById.put(product.getId(), product);
+        }
+
+        // 4. Build the order
         Order order = Order.builder()
                 .userId(userId)
                 .status(OrderStatus.PENDING_PAYMENT)
@@ -53,18 +92,7 @@ public class OrderService {
         int computedItemCount = 0;
 
         for (CartItemDto cartItem : cart.getItems()) {
-            ProductDto product = productClient.fetchProduct(cartItem.getProductId());
-
-            if (Boolean.FALSE.equals(product.getActive())) {
-                throw new ProductUnavailableException(
-                        "Product '" + product.getName() + "' is no longer available");
-            }
-
-            if (product.getStockQuantity() != null
-                    && product.getStockQuantity() < cartItem.getQuantity()) {
-                throw new InsufficientStockException(
-                        product.getName(), cartItem.getQuantity(), product.getStockQuantity());
-            }
+            ProductDto product = productById.get(cartItem.getProductId());
 
             BigDecimal unitPrice = product.getPrice();
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
@@ -78,7 +106,6 @@ public class OrderService {
                     .build();
 
             order.addItem(orderItem);
-
             computedTotal = computedTotal.add(lineTotal);
             computedItemCount += cartItem.getQuantity();
         }
@@ -90,6 +117,7 @@ public class OrderService {
         log.info("Created order {} for user {} (total={}, items={})",
                 saved.getId(), userId, computedTotal, computedItemCount);
 
+        // 5. Clear cart (best-effort)
         try {
             cartClient.clearCart(userId);
         } catch (Exception ex) {
@@ -101,7 +129,7 @@ public class OrderService {
     }
 
     /* ---------------------------------------------------------------- */
-    /* ST1 + ST2 — Order history for a user                              */
+    /* Read APIs (unchanged from US14)                                   */
     /* ---------------------------------------------------------------- */
 
     @Transactional(readOnly = true)
@@ -109,28 +137,18 @@ public class OrderService {
         Page<Order> page = (status == null)
                 ? orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
                 : orderRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status, pageable);
-
         return page.map(this::toSummary);
     }
-
-    /* ---------------------------------------------------------------- */
-    /* ST3 + ST4 + ST5 — Order details by id, with ownership check       */
-    /* ---------------------------------------------------------------- */
 
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long userId, Long orderId) {
         Order order = orderRepository.findWithItemsById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
-
         if (!order.getUserId().equals(userId)) {
-            // Deliberately the same shape as not-found from an attacker's perspective.
-            // We log the real reason, but the public response is "Forbidden", not
-            // "Order X belongs to user Y" — that would leak ownership info.
             log.warn("User {} attempted to access order {} owned by user {}",
                     userId, orderId, order.getUserId());
             throw new OrderAccessDeniedException(orderId);
         }
-
         return toResponse(order);
     }
 
