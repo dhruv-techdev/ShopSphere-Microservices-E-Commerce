@@ -1,0 +1,7 @@
+app:
+  product-service:
+    base-url: http://localhost:8081
+  cart-service:
+    base-url: http://localhost:8083
+  inventory-service:
+    base-url: http://localhost:8085

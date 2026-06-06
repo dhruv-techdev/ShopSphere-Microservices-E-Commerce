@@ -1,0 +1,3 @@
+app:
+  jwt:
+    expiration-ms: 86400000

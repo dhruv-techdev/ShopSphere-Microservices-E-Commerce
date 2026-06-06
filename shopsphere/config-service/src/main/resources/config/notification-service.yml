@@ -1,0 +1,4 @@
+# Currently no service-specific overrides; placeholder for future use.
+app:
+  notification:
+    enabled: true

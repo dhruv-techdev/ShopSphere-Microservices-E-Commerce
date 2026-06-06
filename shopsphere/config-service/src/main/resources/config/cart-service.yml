@@ -1,0 +1,3 @@
+app:
+  cart:
+    ttl-hours: 168

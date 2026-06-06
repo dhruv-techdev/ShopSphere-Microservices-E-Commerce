@@ -1,0 +1,3 @@
+app:
+  product:
+    default-page-size: 20
