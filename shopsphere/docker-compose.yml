@@ -1,4 +1,7 @@
 services:
+
+  # ===================== Infrastructure =====================
+
   postgres:
     image: postgres:16-alpine
     container_name: shopsphere-postgres
@@ -23,6 +26,11 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -47,6 +55,223 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ===================== Platform services =====================
+
+  service-registry:
+    build:
+      context: .
+      dockerfile: service-registry/Dockerfile
+      args:
+        SERVICE_DIR: service-registry
+    container_name: shopsphere-eureka
+    ports:
+      - "8761:8761"
+    environment:
+      EUREKA_HOSTNAME: service-registry
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  config-service:
+    build:
+      context: .
+      dockerfile: config-service/Dockerfile
+      args:
+        SERVICE_DIR: config-service
+    container_name: shopsphere-config
+    ports:
+      - "8888:8888"
+    environment:
+      EUREKA_URL: http://service-registry:8761/eureka/
+    depends_on:
+      service-registry:
+        condition: service_healthy
+
+  # ===================== Business services =====================
+
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+      args:
+        SERVICE_DIR: product-service
+    container_name: shopsphere-product
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shopsphere
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+      args:
+        SERVICE_DIR: user-service
+    container_name: shopsphere-user
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shopsphere?currentSchema=shopsphere_users
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+      JWT_SECRET: change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: cart-service/Dockerfile
+      args:
+        SERVICE_DIR: cart-service
+    container_name: shopsphere-cart
+    ports:
+      - "8083:8083"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PRODUCT_SERVICE_URL: http://product-service:8081
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+    depends_on:
+      redis:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+      args:
+        SERVICE_DIR: order-service
+    container_name: shopsphere-order
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shopsphere?currentSchema=shopsphere_orders
+      KAFKA_BOOTSTRAP: kafka:29092
+      PRODUCT_SERVICE_URL: http://product-service:8081
+      CART_SERVICE_URL: http://cart-service:8083
+      INVENTORY_SERVICE_URL: http://inventory-service:8085
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+      args:
+        SERVICE_DIR: inventory-service
+    container_name: shopsphere-inventory
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shopsphere?currentSchema=shopsphere_inventory
+      KAFKA_BOOTSTRAP: kafka:29092
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+      args:
+        SERVICE_DIR: payment-service
+    container_name: shopsphere-payment
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shopsphere?currentSchema=shopsphere_payments
+      KAFKA_BOOTSTRAP: kafka:29092
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+      PAYMENT_SUCCESS_RATE: 0.85
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+      args:
+        SERVICE_DIR: notification-service
+    container_name: shopsphere-notification
+    ports:
+      - "8087:8087"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/shopsphere?currentSchema=shopsphere_notifications
+      KAFKA_BOOTSTRAP: kafka:29092
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+      args:
+        SERVICE_DIR: api-gateway
+    container_name: shopsphere-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      EUREKA_URL: http://service-registry:8761/eureka/
+      CONFIG_SERVER_URL: http://config-service:8888
+      JWT_SECRET: change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256
+      USER_SERVICE_URL: http://user-service:8082
+      PRODUCT_SERVICE_URL: http://product-service:8081
+      CART_SERVICE_URL: http://cart-service:8083
+      ORDER_SERVICE_URL: http://order-service:8084
+      INVENTORY_SERVICE_URL: http://inventory-service:8085
+      PAYMENT_SERVICE_URL: http://payment-service:8086
+      NOTIFICATION_SERVICE_URL: http://notification-service:8087
+    depends_on:
+      service-registry:
+        condition: service_healthy
 
 volumes:
   postgres-data:

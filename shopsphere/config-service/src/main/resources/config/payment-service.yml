@@ -1,0 +1,4 @@
+app:
+  payment:
+    success-rate: 0.85
+    simulated-latency-ms: 200

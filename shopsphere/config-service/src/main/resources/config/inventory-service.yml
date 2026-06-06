@@ -1,0 +1,3 @@
+app:
+  inventory:
+    low-stock-threshold: 10

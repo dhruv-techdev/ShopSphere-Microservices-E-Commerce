@@ -1,6 +1,6 @@
 # ShopSphere — Services Directory
 
-This directory contains all microservices and the Docker Compose infrastructure. All `mvn -pl` commands must be run from here (where the parent `pom.xml` lives).
+This directory contains all microservices, the shared Docker Compose infrastructure, and the parent Maven POM. All `mvn -pl` commands must be run from here.
 
 See the [root README](../README.md) for the full architecture overview, frontend integration guides, and API reference.
 
@@ -30,20 +30,21 @@ Starts PostgreSQL (5432), Redis (6379), Kafka (9092), and Zookeeper.
 mvn clean install -DskipTests
 ```
 
-### 3. Start services (each in a separate terminal)
+### 3. Start services
 
-Start in this order — Eureka and Gateway must be up before the others register.
+Each in a separate terminal. **Start in this order** — Eureka and Config Server must be up before any other service starts.
 
 ```bash
-mvn -pl service-registry     spring-boot:run   # Eureka  :8761
-mvn -pl api-gateway          spring-boot:run   # Gateway :8080
-mvn -pl user-service         spring-boot:run   # Auth    :8082
-mvn -pl product-service      spring-boot:run   # Catalog :8081
-mvn -pl cart-service         spring-boot:run   # Cart    :8083
-mvn -pl order-service        spring-boot:run   # Orders  :8084
-mvn -pl inventory-service    spring-boot:run   # Stock   :8085
-mvn -pl payment-service      spring-boot:run   # Pay     :8086
-mvn -pl notification-service spring-boot:run   # Notify  :8087
+mvn -pl service-registry     spring-boot:run   # Eureka        :8761
+mvn -pl config-service       spring-boot:run   # Config        :8888
+mvn -pl api-gateway          spring-boot:run   # Gateway       :8080
+mvn -pl user-service         spring-boot:run   # Auth          :8082
+mvn -pl product-service      spring-boot:run   # Catalog       :8081
+mvn -pl cart-service         spring-boot:run   # Cart          :8083
+mvn -pl order-service        spring-boot:run   # Orders        :8084
+mvn -pl inventory-service    spring-boot:run   # Stock         :8085
+mvn -pl payment-service      spring-boot:run   # Payments      :8086
+mvn -pl notification-service spring-boot:run   # Notifications :8087
 ```
 
 All frontend traffic goes to the **gateway at `http://localhost:8080`**.
@@ -70,7 +71,7 @@ All frontend traffic goes to the **gateway at `http://localhost:8080`**.
 
 ## Resetting State
 
-Flush Redis and truncate all tables (useful between test runs):
+Flush Redis and truncate all tables between test runs:
 
 ```bash
 docker exec -i shopsphere-redis redis-cli FLUSHDB > /dev/null
@@ -82,6 +83,8 @@ docker exec -i shopsphere-postgres psql -U shopsphere -d shopsphere -c "
   TRUNCATE TABLE shopsphere_notifications.notifications RESTART IDENTITY CASCADE;
 " > /dev/null
 ```
+
+> `shopsphere_notifications` is created by the notification-service on first startup. If it hasn't run yet, omit that line.
 
 ---
 
@@ -98,7 +101,7 @@ Each service owns its own schema in the shared `shopsphere` database.
 | notification-service | `shopsphere_notifications` |
 | payment-service | `shopsphere_payments` |
 
-Schemas are created on first service startup. Tables are managed by Hibernate `ddl-auto: update`.
+Schemas are created on first service startup via Hikari `connection-init-sql`. Tables are managed by Hibernate `ddl-auto: update`.
 
 ---
 
@@ -118,4 +121,15 @@ To authenticate in Swagger UI: call `POST /api/v1/auth/login`, copy the token, c
 
 ## Eureka Dashboard
 
-http://localhost:8761 — shows all registered services and their instances.
+http://localhost:8761 — shows all registered services and their live status.
+
+---
+
+## Docker Build
+
+Each service has a `Dockerfile` that builds independently from the parent POM. The `<modules>` block is stripped inside the build container so Maven only compiles the one service being built.
+
+```bash
+# Build and start everything with Docker Compose
+docker compose up --build
+```

@@ -2,15 +2,12 @@ server:
   port: 8080
 
 spring:
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
   application:
     name: api-gateway
   cloud:
     gateway:
-      default-filters:
-        - name: DedupeResponseHeader
-          args:
-            name: Access-Control-Allow-Origin Access-Control-Allow-Credentials
-            strategy: RETAIN_FIRST
       routes:
         # ---------- User Service ----------
         - id: user-service-auth
@@ -101,3 +98,13 @@ logging:
   level:
     com.shopsphere.gateway: DEBUG
     org.springframework.cloud.gateway: INFO
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
