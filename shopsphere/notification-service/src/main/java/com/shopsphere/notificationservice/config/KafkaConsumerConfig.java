@@ -1,8 +1,9 @@
-package com.shopsphere.inventoryservice.config;
+package com.shopsphere.notificationservice.config;
 
-import java.util.HashMap;
-import java.util.Map;
-
+import com.shopsphere.common.events.LowStockEvent;
+import com.shopsphere.common.events.OrderCreatedEvent;
+import com.shopsphere.common.events.PaymentFailedEvent;
+import com.shopsphere.common.events.PaymentSuccessfulEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,9 +16,8 @@ import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
-import com.shopsphere.common.events.OrderCreatedEvent;
-import com.shopsphere.common.events.PaymentFailedEvent;
-import com.shopsphere.common.events.PaymentSuccessfulEvent;
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 @EnableKafka
@@ -29,7 +29,7 @@ public class KafkaConsumerConfig {
     private <T> Map<String, Object> baseProps(Class<T> targetType) {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "inventory-service");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "notification-service");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -44,8 +44,7 @@ public class KafkaConsumerConfig {
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent>
             orderCreatedListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent>();
         factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(OrderCreatedEvent.class)));
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.setConcurrency(3);
@@ -55,8 +54,7 @@ public class KafkaConsumerConfig {
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, PaymentSuccessfulEvent>
             paymentSuccessfulListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, PaymentSuccessfulEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, PaymentSuccessfulEvent>();
         factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(PaymentSuccessfulEvent.class)));
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.setConcurrency(3);
@@ -66,11 +64,20 @@ public class KafkaConsumerConfig {
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent>
             paymentFailedListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent>();
         factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(PaymentFailedEvent.class)));
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.setConcurrency(3);
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, LowStockEvent>
+            lowStockListenerContainerFactory() {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, LowStockEvent>();
+        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(LowStockEvent.class)));
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        factory.setConcurrency(1);
         return factory;
     }
 }
