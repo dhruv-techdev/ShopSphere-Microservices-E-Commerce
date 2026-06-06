@@ -1,5 +1,8 @@
 package com.shopsphere.inventoryservice.service;
 
+import com.shopsphere.common.events.OrderCreatedEvent;
+import com.shopsphere.common.events.PaymentFailedEvent;
+import com.shopsphere.common.events.PaymentSuccessfulEvent;
 import com.shopsphere.inventoryservice.dto.CheckAvailabilityRequest;
 import com.shopsphere.inventoryservice.dto.CheckAvailabilityResponse;
 import com.shopsphere.inventoryservice.dto.InitInventoryRequest;
@@ -151,6 +154,66 @@ public class InventoryService {
                 productId, request.getOperation(), before, after);
 
         return toResponse(saved);
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Kafka event handlers: US17+ — Stock reservation lifecycle         */
+    /* ---------------------------------------------------------------- */
+
+    @Transactional
+    public void reserveForOrder(OrderCreatedEvent event) {
+        log.info("Reserving inventory for order eventId={} orderId={} itemCount={}",
+                event.getEventId(), event.getOrderId(), event.getItemCount());
+
+        for (OrderCreatedEvent.Item item : event.getItems()) {
+            Inventory inv = inventoryRepository.findByProductIdForUpdate(item.getProductId())
+                    .orElseThrow(() -> new InventoryNotFoundException(item.getProductId()));
+
+            int newReserved = inv.getReservedQuantity() + item.getQuantity();
+            if (inv.getAvailableQuantity() < newReserved) {
+                throw new InsufficientStockException(
+                        item.getProductId(), item.getQuantity(),
+                        inv.getAvailableQuantity() - inv.getReservedQuantity());
+            }
+
+            inv.setReservedQuantity(newReserved);
+            inventoryRepository.save(inv);
+            log.debug("Reserved {} units of product {} for order {}",
+                    item.getQuantity(), item.getProductId(), event.getOrderId());
+        }
+    }
+
+    @Transactional
+    public void commitReservation(PaymentSuccessfulEvent event) {
+        log.info("Committing reservation for payment eventId={} orderId={}",
+                event.getEventId(), event.getOrderId());
+
+        for (com.shopsphere.common.events.OrderItemSnapshot item : event.getItems()) {
+            Inventory inv = inventoryRepository.findByProductIdForUpdate(item.getProductId())
+                    .orElseThrow(() -> new InventoryNotFoundException(item.getProductId()));
+
+            inv.setAvailableQuantity(inv.getAvailableQuantity() - item.getQuantity());
+            inv.setReservedQuantity(inv.getReservedQuantity() - item.getQuantity());
+            inventoryRepository.save(inv);
+            log.debug("Committed {} units of product {} for order {}",
+                    item.getQuantity(), item.getProductId(), event.getOrderId());
+        }
+    }
+
+    @Transactional
+    public void releaseReservation(PaymentFailedEvent event) {
+        log.info("Releasing reservation for payment eventId={} orderId={}",
+                event.getEventId(), event.getOrderId());
+
+        for (com.shopsphere.common.events.OrderItemSnapshot item : event.getItems()) {
+            Inventory inv = inventoryRepository.findByProductIdForUpdate(item.getProductId())
+                    .orElseThrow(() -> new InventoryNotFoundException(item.getProductId()));
+
+            inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - item.getQuantity()));
+            inventoryRepository.save(inv);
+            log.debug("Released {} units of product {} for order {}",
+                    item.getQuantity(), item.getProductId(), event.getOrderId());
+        }
     }
 
     /* ---------------------------------------------------------------- */

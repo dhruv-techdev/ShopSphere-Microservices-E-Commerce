@@ -1,20 +1,27 @@
 package com.shopsphere.paymentservice.service;
 
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.shopsphere.common.events.OrderCreatedEvent;
+import com.shopsphere.common.events.OrderItemSnapshot;
+import com.shopsphere.common.events.PaymentFailedEvent;
+import com.shopsphere.common.events.PaymentSuccessfulEvent;
 import com.shopsphere.paymentservice.dto.PaymentRequest;
 import com.shopsphere.paymentservice.dto.PaymentResponse;
 import com.shopsphere.paymentservice.entity.Payment;
 import com.shopsphere.paymentservice.entity.PaymentStatus;
 import com.shopsphere.paymentservice.exception.PaymentNotFoundException;
+import com.shopsphere.paymentservice.messaging.PaymentEventPublisher;
 import com.shopsphere.paymentservice.repository.PaymentRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -22,12 +29,41 @@ import java.util.concurrent.ThreadLocalRandom;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final PaymentEventPublisher paymentEventPublisher;
 
     @Value("${app.payment.success-rate}")
     private double successRate;
 
     @Value("${app.payment.simulated-latency-ms}")
     private long simulatedLatencyMs;
+
+    /* ---------------------------------------------------------------- */
+    /* Kafka event handler: US18 — Process order created event          */
+    /* ---------------------------------------------------------------- */
+
+    @Transactional
+    public void processOrderCreated(OrderCreatedEvent event) {
+        log.info("Processing OrderCreatedEvent eventId={} orderId={} amount={}",
+                event.getEventId(), event.getOrderId(), event.getTotalAmount());
+
+        List<OrderItemSnapshot> items = event.getItems().stream()
+                .map(item -> OrderItemSnapshot.builder()
+                        .productId(item.getProductId())
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .build())
+                .toList();
+
+        PaymentRequest request = PaymentRequest.builder()
+                .orderId(event.getOrderId())
+                .userId(event.getUserId())
+                .amount(event.getTotalAmount())
+                .mode(PaymentRequest.SimulationMode.RANDOM)
+                .items(items)
+                .build();
+
+        simulate(request);
+    }
 
     /* ---------------------------------------------------------------- */
     /* ST4 + ST5 + ST6 + ST7 — Simulate                                  */
@@ -78,6 +114,30 @@ public class PaymentService {
         payment = paymentRepository.save(payment);
         log.info("Payment {} for order {} -> {}",
                 payment.getPaymentReference(), payment.getOrderId(), payment.getStatus());
+
+        // Publish payment event for downstream services
+        if (succeeded) {
+            PaymentSuccessfulEvent event = PaymentSuccessfulEvent.builder()
+                    .eventType(PaymentSuccessfulEvent.TYPE)
+                    .orderId(request.getOrderId())
+                    .userId(request.getUserId())
+                    .paymentReference(payment.getPaymentReference())
+                    .amount(request.getAmount())
+                    .items(request.getItems())
+                    .build();
+            paymentEventPublisher.publishSuccessful(event);
+        } else {
+            PaymentFailedEvent event = PaymentFailedEvent.builder()
+                    .eventType(PaymentFailedEvent.TYPE)
+                    .orderId(request.getOrderId())
+                    .userId(request.getUserId())
+                    .paymentReference(payment.getPaymentReference())
+                    .amount(request.getAmount())
+                    .reason(payment.getMessage())
+                    .items(request.getItems())
+                    .build();
+            paymentEventPublisher.publishFailed(event);
+        }
 
         return toResponse(payment);
     }
