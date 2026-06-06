@@ -1,0 +1,20 @@
+app:
+  security:
+    public-paths:
+      - /api/v1/auth/register
+      - /api/v1/auth/login
+      - /api/v1/users/health
+      - /api/v1/products/health
+      - /api/v1/carts/health
+      - /api/v1/orders/health
+      - /api/v1/inventory/health
+      - /api/v1/payments/health
+      - /api/v1/notifications/health
+      - /actuator/health
+    public-get-prefixes:
+      - /api/v1/products
+      - /api/v1/categories
+    admin-write-prefixes:
+      - /api/v1/products
+      - /api/v1/categories
+      - /api/v1/inventory
