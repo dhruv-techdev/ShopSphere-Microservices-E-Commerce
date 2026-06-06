@@ -1,0 +1,103 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      default-filters:
+        - name: DedupeResponseHeader
+          args:
+            name: Access-Control-Allow-Origin Access-Control-Allow-Credentials
+            strategy: RETAIN_FIRST
+      routes:
+        # ---------- User Service ----------
+        - id: user-service-auth
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: user-service-users
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/users/**
+
+        # ---------- Product Service ----------
+        - id: product-service-products
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/products/**
+        - id: product-service-categories
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/categories/**
+
+        # ---------- Cart Service ----------
+        - id: cart-service
+          uri: ${CART_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/carts/**
+
+        # ---------- Order Service ----------
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/orders/**
+
+        # ---------- Inventory Service ----------
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/inventory/**
+
+        # ---------- Payment Service ----------
+        - id: payment-service
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/payments/**
+
+        # ---------- Notification Service ----------
+        - id: notification-service
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8087}
+          predicates:
+            - Path=/api/v1/notifications/**
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256}
+  security:
+    # Routes the gateway lets through without a JWT
+    public-paths:
+      - /api/v1/auth/register
+      - /api/v1/auth/login
+      - /api/v1/users/health
+      - /api/v1/products/health
+      - /api/v1/carts/health
+      - /api/v1/orders/health
+      - /api/v1/inventory/health
+      - /api/v1/payments/health
+      - /api/v1/notifications/health
+      - /actuator/health
+    # GET on these path prefixes is public (browsing catalog without login)
+    public-get-prefixes:
+      - /api/v1/products
+      - /api/v1/categories
+    # Admin-only path prefixes (POST/PUT/DELETE → ADMIN required)
+    admin-write-prefixes:
+      - /api/v1/products
+      - /api/v1/categories
+      - /api/v1/inventory
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.shopsphere.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
