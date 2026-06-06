@@ -1,5 +1,19 @@
 package com.shopsphere.orderservice.service;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+import com.shopsphere.common.events.OrderCreatedEvent;
 import com.shopsphere.orderservice.client.CartClient;
 import com.shopsphere.orderservice.client.CartDto;
 import com.shopsphere.orderservice.client.CartItemDto;
@@ -17,18 +31,11 @@ import com.shopsphere.orderservice.exception.InsufficientStockException;
 import com.shopsphere.orderservice.exception.OrderAccessDeniedException;
 import com.shopsphere.orderservice.exception.OrderNotFoundException;
 import com.shopsphere.orderservice.exception.ProductUnavailableException;
+import com.shopsphere.orderservice.messaging.OrderEventPublisher;
 import com.shopsphere.orderservice.repository.OrderRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +46,8 @@ public class OrderService {
     private final CartClient cartClient;
     private final ProductClient productClient;
     private final InventoryClient inventoryClient;
+    private final OrderEventPublisher orderEventPublisher;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     /* ---------------------------------------------------------------- */
     /* Create order                                                      */
@@ -50,14 +59,13 @@ public class OrderService {
         CartDto cart = cartClient.getCart(userId);
         log.debug("Fetched cart for user {} with {} items", userId, cart.getItems().size());
 
-        // 2. US16 — Batch availability check against inventory-service (authoritative)
+        // 2. Stock check via inventory-service
         List<InventoryClient.Item> stockItems = cart.getItems().stream()
                 .map(ci -> new InventoryClient.Item(ci.getProductId(), ci.getQuantity()))
                 .toList();
         InventoryClient.AvailabilityResult availability = inventoryClient.checkAvailability(stockItems);
 
         if (!availability.allAvailable()) {
-            // Find the first short item to put in the error message
             InventoryClient.ItemAvailability firstShort = availability.items().stream()
                     .filter(i -> !i.available())
                     .findFirst()
@@ -71,7 +79,7 @@ public class OrderService {
                     firstShort.sellableQuantity());
         }
 
-        // 3. For each cart line, fetch product (for active-flag + price snapshot)
+        // 3. Fetch products for price + active-flag snapshot
         Map<Long, ProductDto> productById = new HashMap<>();
         for (CartItemDto cartItem : cart.getItems()) {
             ProductDto product = productClient.fetchProduct(cartItem.getProductId());
@@ -117,7 +125,11 @@ public class OrderService {
         log.info("Created order {} for user {} (total={}, items={})",
                 saved.getId(), userId, computedTotal, computedItemCount);
 
-        // 5. Clear cart (best-effort)
+        // 5. Build the event and ask Spring to publish it AFTER COMMIT
+        OrderCreatedEvent event = buildOrderCreatedEvent(saved);
+        applicationEventPublisher.publishEvent(new OrderPersisted(event));
+
+        // 6. Clear cart (best-effort)
         try {
             cartClient.clearCart(userId);
         } catch (Exception ex) {
@@ -126,6 +138,41 @@ public class OrderService {
         }
 
         return toResponse(saved);
+    }
+
+    /**
+     * Spring fires this only after the DB transaction commits successfully.
+     * If the transaction rolls back, the event is never published — correct behavior:
+     * downstream services shouldn't react to an order that doesn't exist.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onOrderPersisted(OrderPersisted persisted) {
+        orderEventPublisher.publishOrderCreated(persisted.event());
+    }
+
+    /** Internal Spring event wrapper. */
+    private record OrderPersisted(OrderCreatedEvent event) {}
+
+    private OrderCreatedEvent buildOrderCreatedEvent(Order order) {
+        List<OrderCreatedEvent.Item> items = order.getItems().stream()
+                .map(oi -> OrderCreatedEvent.Item.builder()
+                        .productId(oi.getProductId())
+                        .productName(oi.getProductName())
+                        .unitPrice(oi.getUnitPrice())
+                        .quantity(oi.getQuantity())
+                        .build())
+                .toList();
+
+        return OrderCreatedEvent.builder()
+                .eventId(java.util.UUID.randomUUID().toString())
+                .eventType(OrderCreatedEvent.TYPE)
+                .occurredAt(java.time.Instant.now())
+                .orderId(order.getId())
+                .userId(order.getUserId())
+                .totalAmount(order.getTotalAmount())
+                .itemCount(order.getItemCount())
+                .items(items)
+                .build();
     }
 
     /* ---------------------------------------------------------------- */

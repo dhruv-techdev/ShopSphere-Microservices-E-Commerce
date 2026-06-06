@@ -24,6 +24,18 @@ spring:
         default_schema: shopsphere_inventory
     open-in-view: false
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: inventory-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "com.shopsphere.common.events"
+        spring.json.use.type.headers: false
+
 app:
   inventory:
     low-stock-threshold: ${LOW_STOCK_THRESHOLD:10}

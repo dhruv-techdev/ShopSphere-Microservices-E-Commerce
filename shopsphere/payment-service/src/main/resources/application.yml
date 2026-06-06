@@ -1,0 +1,71 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: payment-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/shopsphere?currentSchema=shopsphere_payments
+    username: shopsphere
+    password: shopsphere
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-init-sql: CREATE SCHEMA IF NOT EXISTS shopsphere_payments
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: shopsphere_payments
+    open-in-view: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        linger.ms: 5
+    consumer:
+      group-id: payment-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "com.shopsphere.common.events"
+        spring.json.use.type.headers: false
+
+app:
+  payment:
+    success-rate: ${PAYMENT_SUCCESS_RATE:0.85}
+    simulated-latency-ms: ${PAYMENT_LATENCY_MS:200}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.shopsphere.paymentservice: DEBUG
+    org.hibernate.SQL: DEBUG

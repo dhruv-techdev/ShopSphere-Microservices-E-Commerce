@@ -1,0 +1,30 @@
+package com.shopsphere.notificationservice.exception;
+
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.Instant;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest req) {
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", ex.getMessage(), req);
+    }
+
+    private ResponseEntity<ApiError> build(HttpStatus status, String error, String message,
+                                           HttpServletRequest req) {
+        ApiError body = ApiError.builder()
+                .timestamp(Instant.now())
+                .status(status.value())
+                .error(error)
+                .message(message)
+                .path(req.getRequestURI())
+                .build();
+        return ResponseEntity.status(status).body(body);
+    }
+}
