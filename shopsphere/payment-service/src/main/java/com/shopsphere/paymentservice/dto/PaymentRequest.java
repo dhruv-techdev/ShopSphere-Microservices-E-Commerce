@@ -1,5 +1,6 @@
 package com.shopsphere.paymentservice.dto;
 
+import com.shopsphere.common.events.OrderItemSnapshot;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -10,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -36,6 +38,8 @@ public class PaymentRequest {
      * (test mode "always succeed" / "always fail" credentials).
      */
     private SimulationMode mode;
+
+    private List<OrderItemSnapshot> items;
 
     public enum SimulationMode {
         ALWAYS_SUCCEED,
