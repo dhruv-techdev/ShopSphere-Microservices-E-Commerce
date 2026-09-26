@@ -259,11 +259,14 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__ShippingDb: Host=postgres;Port=5432;Database=shopsphere;Username=shopsphere;Password=shopsphere
+      Kafka__BootstrapServers: kafka:29092
       spring__cloud__config__uri: http://config-service:8888
       eureka__client__serviceUrl: http://service-registry:8761/eureka/
       eureka__instance__hostName: shipping-service
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       service-registry:
         condition: service_healthy

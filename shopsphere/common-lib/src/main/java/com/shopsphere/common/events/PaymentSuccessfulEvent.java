@@ -25,4 +25,10 @@ public class PaymentSuccessfulEvent extends BaseEvent {
 
     /** Items so inventory can deduct without a callback. */
     private List<OrderItemSnapshot> items;
+
+    /**
+     * US35 — carried forward from order.created so shipping-service can create the
+     * shipment without calling order-service. Additive: type stays v1.
+     */
+    private OrderCreatedEvent.ShippingAddress shippingAddress;
 }

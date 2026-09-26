@@ -1,5 +1,6 @@
 package com.shopsphere.paymentservice.service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -60,6 +61,7 @@ public class PaymentService {
                 .amount(event.getTotalAmount())
                 .mode(PaymentRequest.SimulationMode.RANDOM)
                 .items(items)
+                .shippingAddress(event.getShippingAddress())   // US35
                 .build();
 
         simulate(request);
@@ -115,20 +117,27 @@ public class PaymentService {
         log.info("Payment {} for order {} -> {}",
                 payment.getPaymentReference(), payment.getOrderId(), payment.getStatus());
 
-        // Publish payment event for downstream services
+        // Publish payment event for downstream services.
+        // US35 fix: eventId/occurredAt were never set (SuperBuilder bypasses BaseEvent's
+        // constructor), which broke consumer idempotency. Set them explicitly.
         if (succeeded) {
             PaymentSuccessfulEvent event = PaymentSuccessfulEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
                     .eventType(PaymentSuccessfulEvent.TYPE)
+                    .occurredAt(Instant.now())
                     .orderId(request.getOrderId())
                     .userId(request.getUserId())
                     .paymentReference(payment.getPaymentReference())
                     .amount(request.getAmount())
                     .items(request.getItems())
+                    .shippingAddress(request.getShippingAddress())
                     .build();
             paymentEventPublisher.publishSuccessful(event);
         } else {
             PaymentFailedEvent event = PaymentFailedEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
                     .eventType(PaymentFailedEvent.TYPE)
+                    .occurredAt(Instant.now())
                     .orderId(request.getOrderId())
                     .userId(request.getUserId())
                     .paymentReference(payment.getPaymentReference())

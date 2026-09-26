@@ -9,6 +9,7 @@ public sealed class ShippingDbContext(DbContextOptions<ShippingDbContext> option
     public const string Schema = "shopsphere_shipping";
 
     public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

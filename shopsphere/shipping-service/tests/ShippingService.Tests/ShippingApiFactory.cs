@@ -6,12 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ShippingService.Api.Data;
 using ShippingService.Api.Domain;
+using ShippingService.Api.Messaging;
 
 namespace ShippingService.Tests;
 
 /// <summary>
-/// Boots the real app in the "Testing" environment (Config Server + Eureka disabled via
-/// appsettings.Testing.json) and swaps Postgres for an isolated in-memory database.
+/// Boots the real app in the "Testing" environment (Config Server, Eureka and the Kafka
+/// consumer disabled via appsettings.Testing.json), swaps Postgres for an isolated in-memory
+/// database and Kafka publishing for a fake.
 /// </summary>
 public sealed class ShippingApiFactory : WebApplicationFactory<Program>
 {
@@ -24,6 +26,9 @@ public sealed class ShippingApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<DbContextOptions<ShippingDbContext>>();
             services.AddDbContext<ShippingDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+
+            services.RemoveAll<IShipmentEventPublisher>();
+            services.AddSingleton<IShipmentEventPublisher, FakeShipmentEventPublisher>();
         });
     }
 
