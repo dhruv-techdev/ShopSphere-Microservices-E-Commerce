@@ -19,6 +19,8 @@ public sealed class Shipment
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ShippedAt { get; private set; }
     public DateTimeOffset? DeliveredAt { get; private set; }
+    /// <summary>Set once shipment.dispatched is acknowledged by Kafka; null means it still needs (re)publishing.</summary>
+    public DateTimeOffset? DispatchPublishedAt { get; private set; }
 
     public static Shipment Create(long orderId, long userId, ShippingAddress shippingAddress)
     {
@@ -45,6 +47,12 @@ public sealed class Shipment
         TrackingNumber = trackingNumber.Trim();
         ShippedAt = shippedAt;
         Status = ShipmentStatus.Shipped;
+    }
+
+    public void MarkDispatchPublished(DateTimeOffset publishedAt)
+    {
+        EnsureStatus(ShipmentStatus.Shipped, "record dispatch publish for");
+        DispatchPublishedAt = publishedAt;
     }
 
     public void MarkDelivered(DateTimeOffset deliveredAt)
