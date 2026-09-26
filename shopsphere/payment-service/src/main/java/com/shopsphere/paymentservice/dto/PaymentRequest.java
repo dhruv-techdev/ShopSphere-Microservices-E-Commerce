@@ -1,5 +1,6 @@
 package com.shopsphere.paymentservice.dto;
 
+import com.shopsphere.common.events.OrderCreatedEvent;
 import com.shopsphere.common.events.OrderItemSnapshot;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -40,6 +41,9 @@ public class PaymentRequest {
     private SimulationMode mode;
 
     private List<OrderItemSnapshot> items;
+
+    /** US35 — optional; forwarded onto payment.successful for shipping-service. */
+    private OrderCreatedEvent.ShippingAddress shippingAddress;
 
     public enum SimulationMode {
         ALWAYS_SUCCEED,

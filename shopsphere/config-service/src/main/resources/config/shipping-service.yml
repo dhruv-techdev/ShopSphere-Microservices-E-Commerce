@@ -1,5 +1,9 @@
 # Served to shipping-service (.NET 8 / Steeltoe Config Server client).
-# Keys map to IConfiguration (Logging.LogLevel.X -> Logging:LogLevel:X).
+# Keys map to IConfiguration (Shipping.DefaultCarrier -> Shipping:DefaultCarrier).
 Logging:
   LogLevel:
     ShippingService: Debug
+
+Shipping:
+  DefaultCarrier: ShopSphere Express
+  TrackingPrefix: SSX

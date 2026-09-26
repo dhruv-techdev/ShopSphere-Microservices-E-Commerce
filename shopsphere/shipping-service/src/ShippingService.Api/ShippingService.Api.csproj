@@ -23,6 +23,9 @@
     <PackageReference Include="Steeltoe.Discovery.Eureka" Version="3.2.8" />
     <PackageReference Include="Steeltoe.Extensions.Configuration.ConfigServerCore" Version="3.2.8" />
 
+    <!-- Kafka (US35) -->
+    <PackageReference Include="Confluent.Kafka" Version="2.6.1" />
+
     <!-- OpenAPI -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>

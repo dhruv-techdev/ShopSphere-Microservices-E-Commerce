@@ -30,11 +30,13 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
 
         builder.Property(s => s.Carrier).HasColumnName("carrier").HasMaxLength(100);
         builder.Property(s => s.TrackingNumber).HasColumnName("tracking_number").HasMaxLength(100);
+        builder.HasIndex(s => s.TrackingNumber).IsUnique().HasDatabaseName("uk_shipments_tracking_number");
 
         builder.Property(s => s.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(s => s.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(s => s.ShippedAt).HasColumnName("shipped_at");
         builder.Property(s => s.DeliveredAt).HasColumnName("delivered_at");
+        builder.Property(s => s.DispatchPublishedAt).HasColumnName("dispatch_published_at");
 
         builder.OwnsOne(s => s.ShippingAddress, address =>
         {

@@ -6,6 +6,10 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ShippingService.Api.Data;
 using ShippingService.Api.Endpoints;
 using ShippingService.Api.Health;
+using ShippingService.Api.Messaging;
+using ShippingService.Api.Options;
+using ShippingService.Api.Shipping;
+using ShippingService.Api.Tracking;
 using Steeltoe.Discovery.Client;
 using Steeltoe.Extensions.Configuration.ConfigServer;
 
@@ -28,6 +32,24 @@ builder.Services.AddDbContext<ShippingDbContext>(options =>
         npgsql.MigrationsHistoryTable("__EFMigrationsHistory", ShippingDbContext.Schema);
         npgsql.EnableRetryOnFailure(maxRetryCount: 5);
     }));
+
+// ---- Options ----
+builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection(KafkaOptions.SectionName));
+builder.Services.AddOptions<ShippingOptions>()
+    .Bind(builder.Configuration.GetSection(ShippingOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+// ---- US35: shipment creation pipeline ----
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ITrackingNumberGenerator, TrackingNumberGenerator>();
+builder.Services.AddSingleton<IShipmentEventPublisher, KafkaShipmentEventPublisher>();
+builder.Services.AddScoped<PaymentSuccessfulHandler>();
+
+if (builder.Configuration.GetValue($"{KafkaOptions.SectionName}:Enabled", true))
+{
+    builder.Services.AddHostedService<PaymentSuccessfulConsumer>();
+}
 
 // ---- Health checks ----
 builder.Services.AddHealthChecks()
