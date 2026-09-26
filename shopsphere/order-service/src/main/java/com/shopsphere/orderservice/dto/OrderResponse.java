@@ -20,6 +20,8 @@ public class OrderResponse {
     private OrderStatus status;
     private BigDecimal totalAmount;
     private Integer itemCount;
+    /** Null only for orders placed before US33. */
+    private AddressDto shippingAddress;
     private List<OrderItemResponse> items;
     private Instant createdAt;
     private Instant updatedAt;

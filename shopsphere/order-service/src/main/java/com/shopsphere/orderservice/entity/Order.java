@@ -1,6 +1,7 @@
 package com.shopsphere.orderservice.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -43,6 +44,24 @@ public class Order {
 
     @Column(name = "item_count", nullable = false)
     private Integer itemCount;
+
+    /**
+     * US33 — where the order ships. Columns are prefixed with {@code shipping_} so a
+     * billing address can be embedded later without clashes. Null only for legacy orders.
+     */
+    @Embedded
+    @Valid
+    @AttributeOverrides({
+            @AttributeOverride(name = "recipientName", column = @Column(name = "shipping_recipient_name", length = 100)),
+            @AttributeOverride(name = "phone",         column = @Column(name = "shipping_phone", length = 20)),
+            @AttributeOverride(name = "line1",         column = @Column(name = "shipping_line1", length = 200)),
+            @AttributeOverride(name = "line2",         column = @Column(name = "shipping_line2", length = 200)),
+            @AttributeOverride(name = "city",          column = @Column(name = "shipping_city", length = 100)),
+            @AttributeOverride(name = "state",         column = @Column(name = "shipping_state", length = 100)),
+            @AttributeOverride(name = "postalCode",    column = @Column(name = "shipping_postal_code", length = 20)),
+            @AttributeOverride(name = "country",       column = @Column(name = "shipping_country", length = 2))
+    })
+    private Address shippingAddress;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
