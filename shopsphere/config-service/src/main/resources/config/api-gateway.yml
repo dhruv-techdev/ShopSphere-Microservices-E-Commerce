@@ -10,6 +10,7 @@ app:
       - /api/v1/inventory/health
       - /api/v1/payments/health
       - /api/v1/notifications/health
+      - /api/v1/shipments/health
       - /actuator/health
     public-get-prefixes:
       - /api/v1/products
