@@ -55,7 +55,7 @@ import static org.awaitility.Awaitility.await;
         "eureka.client.enabled=false",
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}"
 })
-@EmbeddedKafka(partitions = 1)
+@EmbeddedKafka(partitions = 1, topics = {Topics.RESERVATION_EXPIRED, Topics.ORDER_CANCELLED})
 @Testcontainers(disabledWithoutDocker = true)
 class ReservationExpiryCompensationIntegrationTest {
 
