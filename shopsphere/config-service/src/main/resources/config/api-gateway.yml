@@ -19,3 +19,4 @@ app:
       - /api/v1/products
       - /api/v1/categories
       - /api/v1/inventory
+      - /api/v1/shipments

@@ -63,6 +63,32 @@ public class Order {
     })
     private Address shippingAddress;
 
+    /* ---------- US36: shipment tracking, filled from shipping-service events ---------- */
+
+    @Column(name = "shipment_id")
+    private Long shipmentId;
+
+    @Column(name = "carrier", length = 100)
+    private String carrier;
+
+    @Column(name = "tracking_number", length = 100)
+    private String trackingNumber;
+
+    @Column(name = "shipped_at")
+    private Instant shippedAt;
+
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
+    /* ---------- US38: cancellation ---------- */
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_reason", length = 40)
+    private CancellationReason cancellationReason;
+
+    @Column(name = "cancelled_at")
+    private Instant cancelledAt;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
@@ -79,5 +105,15 @@ public class Order {
     public void addItem(OrderItem item) {
         items.add(item);
         item.setOrder(this);
+    }
+
+    /** US38 — moves the order to CANCELLED, recording why and when. */
+    public void cancel(CancellationReason reason, Instant at) {
+        if (!status.canTransitionTo(OrderStatus.CANCELLED)) {
+            throw new IllegalStateException("Order " + id + " cannot be cancelled from status " + status);
+        }
+        this.status = OrderStatus.CANCELLED;
+        this.cancellationReason = reason;
+        this.cancelledAt = at;
     }
 }

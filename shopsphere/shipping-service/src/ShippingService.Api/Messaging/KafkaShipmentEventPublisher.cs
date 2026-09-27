@@ -29,20 +29,28 @@ public sealed class KafkaShipmentEventPublisher : IShipmentEventPublisher, IDisp
             .Build();
     }
 
-    public async Task PublishDispatchedAsync(ShipmentDispatchedEvent dispatched, CancellationToken cancellationToken)
+    public Task PublishDispatchedAsync(ShipmentDispatchedEvent dispatched, CancellationToken cancellationToken) =>
+        ProduceAsync(Topics.ShipmentDispatched, dispatched.OrderId, dispatched.EventId, dispatched.EventType,
+            EventJson.Serialize(dispatched), cancellationToken);
+
+    public Task PublishDeliveredAsync(ShipmentDeliveredEvent delivered, CancellationToken cancellationToken) =>
+        ProduceAsync(Topics.ShipmentDelivered, delivered.OrderId, delivered.EventId, delivered.EventType,
+            EventJson.Serialize(delivered), cancellationToken);
+
+    private async Task ProduceAsync(string topic, long orderId, string eventId, string eventType, string payload,
+        CancellationToken cancellationToken)
     {
         var message = new Message<string, string>
         {
-            Key = dispatched.OrderId.ToString(CultureInfo.InvariantCulture), // same partitioning key as order/payment events
-            Value = EventJson.Serialize(dispatched),
-            Headers = new Headers { { "eventType", Encoding.UTF8.GetBytes(dispatched.EventType) } }
+            Key = orderId.ToString(CultureInfo.InvariantCulture), // same partitioning key as order/payment events
+            Value = payload,
+            Headers = new Headers { { "eventType", Encoding.UTF8.GetBytes(eventType) } }
         };
 
-        var result = await _producer.ProduceAsync(Topics.ShipmentDispatched, message, cancellationToken);
+        var result = await _producer.ProduceAsync(topic, message, cancellationToken);
 
-        _logger.LogInformation(
-            "Published shipment.dispatched eventId={EventId} orderId={OrderId} tracking={TrackingNumber} to {TopicPartitionOffset}",
-            dispatched.EventId, dispatched.OrderId, dispatched.TrackingNumber, result.TopicPartitionOffset);
+        _logger.LogInformation("Published {EventType} eventId={EventId} orderId={OrderId} to {TopicPartitionOffset}",
+            eventType, eventId, orderId, result.TopicPartitionOffset);
     }
 
     public void Dispose()

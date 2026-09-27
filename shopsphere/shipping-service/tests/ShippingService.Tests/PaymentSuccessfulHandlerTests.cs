@@ -28,11 +28,12 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
 
         var shippingOptions = MsOptions.Create(new ShippingOptions { DefaultCarrier = "ShopSphere Express", TrackingPrefix = "SSX" });
         var time = new FixedTimeProvider(Now);
+        var outbox = new ShipmentEventOutbox(_db, _publisher, time, NullLogger<ShipmentEventOutbox>.Instance);
 
         _handler = new PaymentSuccessfulHandler(
             _db,
             new TrackingNumberGenerator(shippingOptions, time),
-            _publisher,
+            outbox,
             shippingOptions,
             time,
             NullLogger<PaymentSuccessfulHandler>.Instance);

@@ -3,6 +3,7 @@ namespace ShippingService.Api.Domain;
 /// <summary>
 /// One shipment per order. Lifecycle: PENDING → SHIPPED → DELIVERED, or PENDING → CANCELLED.
 /// Timestamps (CreatedAt/UpdatedAt) are stamped by ShippingDbContext on save.
+/// *PublishedAt columns form a small outbox: null means the event still has to go out.
 /// </summary>
 public sealed class Shipment
 {
@@ -19,8 +20,12 @@ public sealed class Shipment
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ShippedAt { get; private set; }
     public DateTimeOffset? DeliveredAt { get; private set; }
-    /// <summary>Set once shipment.dispatched is acknowledged by Kafka; null means it still needs (re)publishing.</summary>
+
+    /// <summary>US35 — set once shipment.dispatched has been acknowledged by Kafka.</summary>
     public DateTimeOffset? DispatchPublishedAt { get; private set; }
+
+    /// <summary>US36 — set once shipment.delivered has been acknowledged by Kafka.</summary>
+    public DateTimeOffset? DeliveredPublishedAt { get; private set; }
 
     public static Shipment Create(long orderId, long userId, ShippingAddress shippingAddress)
     {
@@ -51,8 +56,12 @@ public sealed class Shipment
 
     public void MarkDispatchPublished(DateTimeOffset publishedAt)
     {
-        EnsureStatus(ShipmentStatus.Shipped, "record dispatch publish for");
-        DispatchPublishedAt = publishedAt;
+        if (Status != ShipmentStatus.Shipped && Status != ShipmentStatus.Delivered)
+        {
+            throw new InvalidOperationException(
+                $"Cannot record dispatch publication for shipment {Id} in status {Status}.");
+        }
+        DispatchPublishedAt ??= publishedAt;
     }
 
     public void MarkDelivered(DateTimeOffset deliveredAt)
@@ -60,6 +69,16 @@ public sealed class Shipment
         EnsureStatus(ShipmentStatus.Shipped, "deliver");
         DeliveredAt = deliveredAt;
         Status = ShipmentStatus.Delivered;
+    }
+
+    public void MarkDeliveredPublished(DateTimeOffset publishedAt)
+    {
+        if (Status != ShipmentStatus.Delivered)
+        {
+            throw new InvalidOperationException(
+                $"Cannot record delivery publication for shipment {Id} in status {Status}.");
+        }
+        DeliveredPublishedAt ??= publishedAt;
     }
 
     public void Cancel()

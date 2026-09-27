@@ -40,15 +40,18 @@ builder.Services.AddOptions<ShippingOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-// ---- US35: shipment creation pipeline ----
+// ---- Shipment pipeline (US35 + US36) ----
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITrackingNumberGenerator, TrackingNumberGenerator>();
 builder.Services.AddSingleton<IShipmentEventPublisher, KafkaShipmentEventPublisher>();
+builder.Services.AddScoped<ShipmentEventOutbox>();
 builder.Services.AddScoped<PaymentSuccessfulHandler>();
+builder.Services.AddScoped<ShipmentLifecycleService>();
 
 if (builder.Configuration.GetValue($"{KafkaOptions.SectionName}:Enabled", true))
 {
     builder.Services.AddHostedService<PaymentSuccessfulConsumer>();
+    builder.Services.AddHostedService<ShipmentOutboxRelay>();
 }
 
 // ---- Health checks ----

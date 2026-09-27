@@ -37,6 +37,7 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
         builder.Property(s => s.ShippedAt).HasColumnName("shipped_at");
         builder.Property(s => s.DeliveredAt).HasColumnName("delivered_at");
         builder.Property(s => s.DispatchPublishedAt).HasColumnName("dispatch_published_at");
+        builder.Property(s => s.DeliveredPublishedAt).HasColumnName("delivered_published_at");
 
         builder.OwnsOne(s => s.ShippingAddress, address =>
         {
