@@ -1,5 +1,6 @@
 package com.shopsphere.notificationservice.dto;
 
+import com.shopsphere.notificationservice.entity.DeliveryStatus;
 import com.shopsphere.notificationservice.entity.NotificationType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +20,9 @@ public class NotificationResponse {
     private Long orderId;
     private String subject;
     private String body;
-    private String deliveryStatus;
+    private DeliveryStatus deliveryStatus;
+    private String channel;
+    private Instant sentAt;
+    private String failureReason;
     private Instant createdAt;
 }

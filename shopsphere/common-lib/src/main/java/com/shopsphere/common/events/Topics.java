@@ -17,4 +17,5 @@ public final class Topics {
     public static final String RESERVATION_EXPIRED   = "inventory.reservation-expired";
     public static final String SHIPMENT_DISPATCHED   = "shipment.dispatched";
     public static final String SHIPMENT_DELIVERED    = "shipment.delivered";
+    public static final String NOTIFICATION_DLQ      = "notification.dlq";
 }

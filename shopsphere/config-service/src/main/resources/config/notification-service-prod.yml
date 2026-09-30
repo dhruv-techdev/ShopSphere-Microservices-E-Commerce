@@ -1,0 +1,5 @@
+# SPRING_PROFILES_ACTIVE=prod → real email through SendGrid.
+# Requires SENDGRID_API_KEY (and a verified sender for NOTIFICATION_FROM) in the environment.
+app:
+  notification:
+    channel: sendgrid

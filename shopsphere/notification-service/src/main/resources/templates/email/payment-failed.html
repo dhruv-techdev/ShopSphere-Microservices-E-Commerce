@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head><meta charset="UTF-8"><title th:text="${subject}">Payment failed</title></head>
+<body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+       style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;padding:24px;">
+    <tr><td>
+        <div th:replace="~{email/fragments :: header}"></div>
+        <p>Hi <span th:text="${recipientName}">there</span>,</p>
+        <p>Unfortunately your payment of <strong>$<span th:text="${amount}">0.00</span></strong> for order
+            <strong th:text="|#${orderId}|">#1</strong> couldn't be processed.</p>
+        <p style="background:#fef2f2;border-left:4px solid #dc2626;padding:10px 12px;">
+            Reason: <span th:text="${reason}">declined</span></p>
+        <p>Your reserved stock has been released. Please try again with a different payment method.</p>
+        <div th:replace="~{email/fragments :: footer}"></div>
+    </td></tr>
+</table>
+</body>
+</html>

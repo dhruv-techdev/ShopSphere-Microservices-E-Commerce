@@ -38,15 +38,73 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    # US40 — producer for notification.dlq
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+
+  # US39 — SMTP (used when app.notification.channel=smtp). Defaults target Mailpit.
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+
+  thymeleaf:
+    check-template-location: true
+    cache: true
+
+app:
+  notification:
+    # log (default, no email sent) | smtp | sendgrid — see config-service for per-environment overrides
+    channel: ${NOTIFICATION_CHANNEL:log}
+    from-address: ${NOTIFICATION_FROM:no-reply@shopsphere.local}
+    from-name: ${NOTIFICATION_FROM_NAME:ShopSphere}
+    admin-email: ${NOTIFICATION_ADMIN_EMAIL:ops@shopsphere.local}
+    sendgrid:
+      api-key: ${SENDGRID_API_KEY:}
+      base-url: ${SENDGRID_BASE_URL:https://api.sendgrid.com}
+    # US40 — exponential backoff: initial-delay * multiplier^(attempt-1), capped at max-delay
+    retry:
+      enabled: ${NOTIFICATION_RETRY_ENABLED:true}
+      max-attempts: ${NOTIFICATION_RETRY_MAX_ATTEMPTS:5}
+      initial-delay: ${NOTIFICATION_RETRY_INITIAL_DELAY:30s}
+      multiplier: ${NOTIFICATION_RETRY_MULTIPLIER:2.0}
+      max-delay: ${NOTIFICATION_RETRY_MAX_DELAY:30m}
+      lease: 5m
+      batch-size: 50
+      poll-interval-ms: ${NOTIFICATION_RETRY_POLL_INTERVAL_MS:15000}
+      initial-poll-delay-ms: 20000
+  user-service:
+    base-url: ${USER_SERVICE_URL:http://localhost:8082}
+  internal:
+    token: ${INTERNAL_API_TOKEN:}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
+  health:
+    mail:
+      enabled: false   # SMTP may be unused (log/sendgrid); don't mark the service DOWN for it
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 springdoc:
   api-docs:

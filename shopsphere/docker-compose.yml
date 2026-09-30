@@ -44,8 +44,18 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: shopsphere-kafka
-    # On a quick restart ZooKeeper may still hold the old broker registration (NodeExists)
-    # until its session times out (~18s); retrying lets Kafka come up once it expires.
+    # ZooKeeper keeps its data across restarts, so after an unclean Kafka stop the old
+    # /brokers/ids/1 registration lingers until its session expires (~18s) and a fresh
+    # broker dies with NodeExistsException. Wait for it to clear, then start normally.
+    command:
+      - bash
+      - -c
+      - |
+        while timeout 10 zookeeper-shell zookeeper:2181 get /brokers/ids/1 2>/dev/null | grep -q '"host"'; do
+          echo "Waiting for stale broker registration in ZooKeeper to expire..."
+          sleep 3
+        done
+        exec /etc/confluent/docker/run
     restart: on-failure
     depends_on:
       - zookeeper
@@ -63,6 +73,14 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
+
+  # US39 — local SMTP catcher. Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: shopsphere-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
   # ===================== Platform services =====================
 
@@ -133,6 +151,7 @@ services:
       EUREKA_URL: http://service-registry:8761/eureka/
       CONFIG_SERVER_URL: http://config-service:8888
       JWT_SECRET: change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-change-me}
     depends_on:
       postgres:
         condition: service_healthy
@@ -244,6 +263,15 @@ services:
       KAFKA_BOOTSTRAP: kafka:29092
       EUREKA_URL: http://service-registry:8761/eureka/
       CONFIG_SERVER_URL: http://config-service:8888
+      # US39 — real delivery in Docker goes to Mailpit
+      NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-smtp}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      NOTIFICATION_FROM: no-reply@shopsphere.local
+      NOTIFICATION_ADMIN_EMAIL: ops@shopsphere.local
+      USER_SERVICE_URL: http://user-service:8082
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-change-me}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -251,6 +279,8 @@ services:
         condition: service_healthy
       service-registry:
         condition: service_healthy
+      mailpit:
+        condition: service_started
 
   shipping-service:
     build:

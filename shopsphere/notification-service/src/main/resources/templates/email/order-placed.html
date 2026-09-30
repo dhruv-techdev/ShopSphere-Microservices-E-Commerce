@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head><meta charset="UTF-8"><title th:text="${subject}">Order received</title></head>
+<body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+       style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;padding:24px;">
+    <tr><td>
+        <div th:replace="~{email/fragments :: header}"></div>
+        <p>Hi <span th:text="${recipientName}">there</span>,</p>
+        <p>We've received your order <strong th:text="|#${orderId}|">#1</strong>.</p>
+        <table role="presentation" cellpadding="6" style="border-collapse:collapse;">
+            <tr><td style="color:#6b7280;">Items</td><td th:text="${itemCount}">1</td></tr>
+            <tr><td style="color:#6b7280;">Total</td><td>$<span th:text="${totalAmount}">0.00</span></td></tr>
+        </table>
+        <p>We'll let you know as soon as payment is confirmed.</p>
+        <div th:replace="~{email/fragments :: footer}"></div>
+    </td></tr>
+</table>
+</body>
+</html>
