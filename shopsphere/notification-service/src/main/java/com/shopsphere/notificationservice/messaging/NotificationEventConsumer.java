@@ -4,6 +4,8 @@ import com.shopsphere.common.events.LowStockEvent;
 import com.shopsphere.common.events.OrderCreatedEvent;
 import com.shopsphere.common.events.PaymentFailedEvent;
 import com.shopsphere.common.events.PaymentSuccessfulEvent;
+import com.shopsphere.common.events.ShipmentDeliveredEvent;
+import com.shopsphere.common.events.ShipmentDispatchedEvent;
 import com.shopsphere.common.events.Topics;
 import com.shopsphere.notificationservice.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -107,6 +109,52 @@ public class NotificationEventConsumer {
             ack.acknowledge();
         } catch (Exception ex) {
             log.error("Failed to handle inventory.low-stock eventId={}: {}",
+                    event.getEventId(), ex.getMessage(), ex);
+            throw ex;
+        }
+    }
+
+    /* ---------------- US36 — shipment notifications ---------------- */
+
+    @KafkaListener(
+            topics = Topics.SHIPMENT_DISPATCHED,
+            groupId = "notification-service",
+            containerFactory = "shipmentDispatchedListenerContainerFactory"
+    )
+    public void onShipmentDispatched(
+            @Payload ShipmentDispatchedEvent event,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            Acknowledgment ack) {
+
+        log.info("Notification received shipment.dispatched eventId={} orderId={} offset={}",
+                event.getEventId(), event.getOrderId(), offset);
+        try {
+            notificationService.handleShipmentDispatched(event);
+            ack.acknowledge();
+        } catch (Exception ex) {
+            log.error("Failed to handle shipment.dispatched eventId={}: {}",
+                    event.getEventId(), ex.getMessage(), ex);
+            throw ex;
+        }
+    }
+
+    @KafkaListener(
+            topics = Topics.SHIPMENT_DELIVERED,
+            groupId = "notification-service",
+            containerFactory = "shipmentDeliveredListenerContainerFactory"
+    )
+    public void onShipmentDelivered(
+            @Payload ShipmentDeliveredEvent event,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            Acknowledgment ack) {
+
+        log.info("Notification received shipment.delivered eventId={} orderId={} offset={}",
+                event.getEventId(), event.getOrderId(), offset);
+        try {
+            notificationService.handleShipmentDelivered(event);
+            ack.acknowledge();
+        } catch (Exception ex) {
+            log.error("Failed to handle shipment.delivered eventId={}: {}",
                     event.getEventId(), ex.getMessage(), ex);
             throw ex;
         }

@@ -43,36 +43,49 @@ public class OrderController {
                     Creates a new order containing all items currently in the user's cart.
 
                     Flow:
-                    1. Fetches the cart from Cart Service.
-                    2. Re-fetches each product from Product Service to validate availability and stock.
-                    3. Snapshots product name and current price into immutable order line items.
-                    4. Saves the order in PENDING_PAYMENT status.
-                    5. Clears the user's cart (best-effort).
+                    1. Validates the request, including the required shipping address.
+                    2. Fetches the cart from Cart Service.
+                    3. Checks stock with Inventory Service.
+                    4. Re-fetches each product from Product Service to validate availability.
+                    5. Snapshots product name, current price and the shipping address onto the order.
+                    6. Saves the order in PENDING_PAYMENT status and publishes order.created after commit.
+                    7. Clears the user's cart (best-effort).
                     """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Order created in PENDING_PAYMENT status"),
-            @ApiResponse(responseCode = "400", description = "Cart is empty or request invalid",
+            @ApiResponse(responseCode = "400", description = "Missing/invalid shipping address, empty cart or malformed body",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "A product in the cart no longer exists",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "409", description = "Product inactive or insufficient stock",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "502", description = "Cart or Product Service unavailable",
+            @ApiResponse(responseCode = "502", description = "Cart, Product or Inventory Service unavailable",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<OrderResponse> createOrder(
             @Parameter(description = "Customer user id", required = true, example = "1")
             @RequestHeader("X-User-Id") @Positive Long userId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = false,
+                    required = true,
                     content = @Content(examples = @ExampleObject(value = """
-                            { "notes": "Please leave at the front door" }
+                            {
+                              "shippingAddress": {
+                                "recipientName": "Jane Doe",
+                                "phone": "+1 416 555 0199",
+                                "line1": "123 King St W",
+                                "line2": "Unit 4",
+                                "city": "Toronto",
+                                "state": "ON",
+                                "postalCode": "M5V 3L9",
+                                "country": "CA"
+                              },
+                              "notes": "Please leave at the front door"
+                            }
                             """))
             )
-            @Valid @RequestBody(required = false) CreateOrderRequest request) {
-        CreateOrderRequest body = request == null ? new CreateOrderRequest() : request;
-        OrderResponse response = orderService.createOrder(userId, body);
+            @Valid @RequestBody CreateOrderRequest request) {
+        OrderResponse response = orderService.createOrder(userId, request);
         return ResponseEntity
                 .created(URI.create("/api/v1/orders/" + response.getId()))
                 .body(response);
@@ -107,10 +120,11 @@ public class OrderController {
     @Operation(
             summary = "Get details for a specific order",
             description = """
-                    Returns the full order with all line items.
+                    Returns the full order with all line items and the shipping address.
 
                     - The authenticated user must own this order, otherwise 403 Forbidden.
                     - Items include snapshotted product name and unit price from the time of order.
+                    - shippingAddress is null only for orders placed before shipping addresses existed.
                     """
     )
     @ApiResponses({

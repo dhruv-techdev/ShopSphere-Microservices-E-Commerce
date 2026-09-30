@@ -59,6 +59,12 @@ spring:
           predicates:
             - Path=/api/v1/notifications/**
 
+        # ---------- Shipping Service (.NET 8 + Steeltoe) ----------
+        - id: shipping-service
+          uri: ${SHIPPING_SERVICE_URL:http://localhost:8088}
+          predicates:
+            - Path=/api/v1/shipments/**
+
 app:
   jwt:
     secret: ${JWT_SECRET:change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256}
@@ -74,6 +80,7 @@ app:
       - /api/v1/inventory/health
       - /api/v1/payments/health
       - /api/v1/notifications/health
+      - /api/v1/shipments/health
       - /actuator/health
     # GET on these path prefixes is public (browsing catalog without login)
     public-get-prefixes:
@@ -84,6 +91,7 @@ app:
       - /api/v1/products
       - /api/v1/categories
       - /api/v1/inventory
+      - /api/v1/shipments
 
 management:
   endpoints:

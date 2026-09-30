@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -20,10 +21,12 @@ import com.shopsphere.orderservice.client.CartItemDto;
 import com.shopsphere.orderservice.client.InventoryClient;
 import com.shopsphere.orderservice.client.ProductClient;
 import com.shopsphere.orderservice.client.ProductDto;
+import com.shopsphere.orderservice.dto.AddressDto;
 import com.shopsphere.orderservice.dto.CreateOrderRequest;
 import com.shopsphere.orderservice.dto.OrderItemResponse;
 import com.shopsphere.orderservice.dto.OrderResponse;
 import com.shopsphere.orderservice.dto.OrderSummaryResponse;
+import com.shopsphere.orderservice.entity.Address;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.entity.OrderItem;
 import com.shopsphere.orderservice.entity.OrderStatus;
@@ -55,6 +58,10 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
+        // 0. Guard: the controller validates this; fail fast before any remote calls.
+        Objects.requireNonNull(request, "request is required");
+        Objects.requireNonNull(request.getShippingAddress(), "shippingAddress is required");
+
         // 1. Fetch cart
         CartDto cart = cartClient.getCart(userId);
         log.debug("Fetched cart for user {} with {} items", userId, cart.getItems().size());
@@ -90,10 +97,11 @@ public class OrderService {
             productById.put(product.getId(), product);
         }
 
-        // 4. Build the order
+        // 4. Build the order (US33: snapshot the shipping address)
         Order order = Order.builder()
                 .userId(userId)
                 .status(OrderStatus.PENDING_PAYMENT)
+                .shippingAddress(request.getShippingAddress().toEntity())
                 .build();
 
         BigDecimal computedTotal = BigDecimal.ZERO;
@@ -122,8 +130,9 @@ public class OrderService {
         order.setItemCount(computedItemCount);
 
         Order saved = orderRepository.save(order);
-        log.info("Created order {} for user {} (total={}, items={})",
-                saved.getId(), userId, computedTotal, computedItemCount);
+        log.info("Created order {} for user {} (total={}, items={}, shipTo={}/{})",
+                saved.getId(), userId, computedTotal, computedItemCount,
+                saved.getShippingAddress().getCity(), saved.getShippingAddress().getCountry());
 
         // 5. Build the event and ask Spring to publish it AFTER COMMIT
         OrderCreatedEvent event = buildOrderCreatedEvent(saved);
@@ -150,8 +159,8 @@ public class OrderService {
         orderEventPublisher.publishOrderCreated(persisted.event());
     }
 
-    /** Internal Spring event wrapper. */
-    private record OrderPersisted(OrderCreatedEvent event) {}
+    /** Internal Spring event wrapper. Package-private so unit tests can inspect the payload. */
+    record OrderPersisted(OrderCreatedEvent event) {}
 
     private OrderCreatedEvent buildOrderCreatedEvent(Order order) {
         List<OrderCreatedEvent.Item> items = order.getItems().stream()
@@ -172,11 +181,28 @@ public class OrderService {
                 .totalAmount(order.getTotalAmount())
                 .itemCount(order.getItemCount())
                 .items(items)
+                .shippingAddress(toEventAddress(order.getShippingAddress()))
+                .build();
+    }
+
+    private static OrderCreatedEvent.ShippingAddress toEventAddress(Address address) {
+        if (address == null) {
+            return null;
+        }
+        return OrderCreatedEvent.ShippingAddress.builder()
+                .recipientName(address.getRecipientName())
+                .phone(address.getPhone())
+                .line1(address.getLine1())
+                .line2(address.getLine2())
+                .city(address.getCity())
+                .state(address.getState())
+                .postalCode(address.getPostalCode())
+                .country(address.getCountry())
                 .build();
     }
 
     /* ---------------------------------------------------------------- */
-    /* Read APIs (unchanged from US14)                                   */
+    /* Read APIs                                                         */
     /* ---------------------------------------------------------------- */
 
     @Transactional(readOnly = true)
@@ -210,6 +236,16 @@ public class OrderService {
                 .status(order.getStatus())
                 .totalAmount(order.getTotalAmount())
                 .itemCount(order.getItemCount())
+                .shippingAddress(AddressDto.from(order.getShippingAddress()))
+                .shipmentId(order.getShipmentId())
+                .carrier(order.getCarrier())
+                .trackingNumber(order.getTrackingNumber())
+                .shippedAt(order.getShippedAt())
+                .deliveredAt(order.getDeliveredAt())
+                .cancellationReason(order.getCancellationReason())
+                .cancellationDescription(order.getCancellationReason() == null
+                        ? null : order.getCancellationReason().getDescription())
+                .cancelledAt(order.getCancelledAt())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .items(order.getItems().stream()

@@ -15,9 +15,19 @@ spring:
     hikari:
       connection-init-sql: CREATE SCHEMA IF NOT EXISTS shopsphere_notifications
 
+  # US36 — Flyway owns the schema. Existing (Hibernate-created) DBs are baselined at V1.
+  flyway:
+    enabled: true
+    schemas: shopsphere_notifications
+    default-schema: shopsphere_notifications
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: Pre-Flyway Hibernate-managed schema
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -48,6 +58,7 @@ logging:
   level:
     com.shopsphere.notificationservice: DEBUG
     org.hibernate.SQL: DEBUG
+    org.flywaydb: INFO
 
 eureka:
   client:
