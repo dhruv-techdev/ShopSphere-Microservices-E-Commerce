@@ -44,6 +44,9 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: shopsphere-kafka
+    # On a quick restart ZooKeeper may still hold the old broker registration (NodeExists)
+    # until its session times out (~18s); retrying lets Kafka come up once it expires.
+    restart: on-failure
     depends_on:
       - zookeeper
     ports:

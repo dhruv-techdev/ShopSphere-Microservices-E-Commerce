@@ -24,7 +24,7 @@ namespace ShippingService.Api.Shipping;
 public sealed class PaymentSuccessfulHandler(
     ShippingDbContext db,
     ITrackingNumberGenerator trackingNumbers,
-    IShipmentEventPublisher publisher,
+    ShipmentEventOutbox outbox,
     IOptions<ShippingOptions> shippingOptions,
     TimeProvider timeProvider,
     ILogger<PaymentSuccessfulHandler> logger)
@@ -84,7 +84,7 @@ public sealed class PaymentSuccessfulHandler(
         logger.LogInformation("Created shipment {ShipmentId} for orderId={OrderId} carrier={Carrier} tracking={TrackingNumber}",
             shipment.Id, shipment.OrderId, shipment.Carrier, shipment.TrackingNumber);
 
-        await PublishDispatchedAsync(shipment, ct);
+        await outbox.PublishDispatchedAsync(shipment, ct);
         return HandleOutcome.Created;
     }
 
@@ -132,19 +132,11 @@ public sealed class PaymentSuccessfulHandler(
     private async Task EnsureDispatchPublishedAsync(long orderId, CancellationToken ct)
     {
         var shipment = await db.Shipments.FirstOrDefaultAsync(s => s.OrderId == orderId, ct);
-        if (shipment is { Status: ShipmentStatus.Shipped, DispatchPublishedAt: null })
+        if (shipment is not null && ShipmentEventOutbox.NeedsDispatchPublish(shipment))
         {
             logger.LogInformation("Re-publishing shipment.dispatched for shipment {ShipmentId}", shipment.Id);
-            await PublishDispatchedAsync(shipment, ct);
+            await outbox.PublishDispatchedAsync(shipment, ct);
         }
-    }
-
-    private async Task PublishDispatchedAsync(Shipment shipment, CancellationToken ct)
-    {
-        var now = timeProvider.GetUtcNow();
-        await publisher.PublishDispatchedAsync(ShipmentDispatchedEvent.From(shipment, now), ct);
-        shipment.MarkDispatchPublished(now);
-        await db.SaveChangesAsync(ct);
     }
 
     /// <returns>false if a unique constraint (event id / order id) was hit — someone else won.</returns>

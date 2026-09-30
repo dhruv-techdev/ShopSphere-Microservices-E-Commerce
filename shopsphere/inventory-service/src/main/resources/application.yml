@@ -41,6 +41,13 @@ spring:
 app:
   inventory:
     low-stock-threshold: ${LOW_STOCK_THRESHOLD:10}
+    # US37 — stock holds for unpaid orders time out and are released by a sweeper
+    reservation:
+      ttl: ${RESERVATION_TTL:15m}
+      sweeper-enabled: ${RESERVATION_SWEEPER_ENABLED:true}
+      sweep-interval-ms: ${RESERVATION_SWEEP_INTERVAL_MS:60000}
+      sweep-initial-delay-ms: ${RESERVATION_SWEEP_INITIAL_DELAY_MS:30000}
+      sweep-batch-size: ${RESERVATION_SWEEP_BATCH_SIZE:100}
 
 management:
   endpoints:

@@ -1,9 +1,12 @@
 package com.shopsphere.notificationservice.config;
 
 import com.shopsphere.common.events.LowStockEvent;
+import com.shopsphere.common.events.OrderCancelledEvent;
 import com.shopsphere.common.events.OrderCreatedEvent;
 import com.shopsphere.common.events.PaymentFailedEvent;
 import com.shopsphere.common.events.PaymentSuccessfulEvent;
+import com.shopsphere.common.events.ShipmentDeliveredEvent;
+import com.shopsphere.common.events.ShipmentDispatchedEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,43 +44,53 @@ public class KafkaConsumerConfig {
         return props;
     }
 
+    private <T> ConcurrentKafkaListenerContainerFactory<String, T> factory(Class<T> type, int concurrency) {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, T>();
+        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(type)));
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        factory.setConcurrency(concurrency);
+        return factory;
+    }
+
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent>
             orderCreatedListenerContainerFactory() {
-        var factory = new ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent>();
-        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(OrderCreatedEvent.class)));
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        factory.setConcurrency(3);
-        return factory;
+        return factory(OrderCreatedEvent.class, 3);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderCancelledEvent>
+            orderCancelledListenerContainerFactory() {
+        return factory(OrderCancelledEvent.class, 3);
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, PaymentSuccessfulEvent>
             paymentSuccessfulListenerContainerFactory() {
-        var factory = new ConcurrentKafkaListenerContainerFactory<String, PaymentSuccessfulEvent>();
-        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(PaymentSuccessfulEvent.class)));
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        factory.setConcurrency(3);
-        return factory;
+        return factory(PaymentSuccessfulEvent.class, 3);
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent>
             paymentFailedListenerContainerFactory() {
-        var factory = new ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent>();
-        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(PaymentFailedEvent.class)));
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        factory.setConcurrency(3);
-        return factory;
+        return factory(PaymentFailedEvent.class, 3);
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, LowStockEvent>
             lowStockListenerContainerFactory() {
-        var factory = new ConcurrentKafkaListenerContainerFactory<String, LowStockEvent>();
-        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(baseProps(LowStockEvent.class)));
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        factory.setConcurrency(1);
-        return factory;
+        return factory(LowStockEvent.class, 1);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ShipmentDispatchedEvent>
+            shipmentDispatchedListenerContainerFactory() {
+        return factory(ShipmentDispatchedEvent.class, 3);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ShipmentDeliveredEvent>
+            shipmentDeliveredListenerContainerFactory() {
+        return factory(ShipmentDeliveredEvent.class, 3);
     }
 }
