@@ -31,6 +31,7 @@
 
     <modules>
         <module>common-lib</module>
+        <module>security-lib</module>
         <module>service-registry</module>
         <module>config-service</module>
         <module>api-gateway</module>

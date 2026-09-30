@@ -10,4 +10,7 @@ import java.util.Optional;
 public interface CategoryRepository extends JpaRepository<Category, Long> {
     Optional<Category> findByNameIgnoreCase(String name);
     boolean existsByNameIgnoreCase(String name);
+
+    /** US44 — rename check that ignores the category being edited. */
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 }

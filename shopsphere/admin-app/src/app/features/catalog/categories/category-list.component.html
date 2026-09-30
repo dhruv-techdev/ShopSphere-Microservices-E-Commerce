@@ -1,0 +1,87 @@
+<header class="page-header">
+  <div>
+    <h1>Categories</h1>
+    <p class="muted">{{ categories().length }} {{ categories().length === 1 ? 'category' : 'categories' }}</p>
+  </div>
+  <button mat-flat-button type="button" (click)="openEditor()" data-testid="new-category">
+    <mat-icon>add</mat-icon>
+    New category
+  </button>
+</header>
+
+<div class="filters">
+  <mat-form-field appearance="outline" class="filters__search" subscriptSizing="dynamic">
+    <mat-label>Filter categories</mat-label>
+    <mat-icon matPrefix>search</mat-icon>
+    <input matInput [formControl]="search" autocomplete="off" />
+  </mat-form-field>
+</div>
+
+@if (error()) {
+  <div class="banner banner--error" role="alert" data-testid="list-error">
+    <span>{{ error() }}</span>
+    <button mat-button type="button" (click)="reload()">Retry</button>
+  </div>
+}
+
+<section class="table-card">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <div class="table-scroll">
+    <table mat-table [dataSource]="visible()">
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <td mat-cell *matCellDef="let category" class="strong">{{ category.name }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="description">
+        <th mat-header-cell *matHeaderCellDef>Description</th>
+        <td mat-cell *matCellDef="let category" class="cell-sub">{{ category.description ?? '—' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="productCount">
+        <th mat-header-cell *matHeaderCellDef class="num">Products</th>
+        <td mat-cell *matCellDef="let category" class="num">
+          <a class="cell-link" [routerLink]="['/products']" [queryParams]="{ categoryId: category.id }">
+            {{ category.productCount ?? 0 }}
+          </a>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="createdAt">
+        <th mat-header-cell *matHeaderCellDef>Created</th>
+        <td mat-cell *matCellDef="let category">{{ category.createdAt | date: 'mediumDate' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="actions"><span class="sr-only">Actions</span></th>
+        <td mat-cell *matCellDef="let category" class="actions">
+          <button mat-icon-button type="button" matTooltip="Edit" [attr.aria-label]="'Edit ' + category.name" (click)="openEditor(category)">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <span [matTooltip]="inUse(category) ? 'Move or delete its products first' : 'Delete'">
+            <button
+              mat-icon-button
+              type="button"
+              [disabled]="inUse(category)"
+              [attr.aria-label]="'Delete ' + category.name"
+              (click)="deleteCategory(category)"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </span>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns" data-testid="category-row"></tr>
+      <tr class="mat-mdc-row" *matNoDataRow>
+        <td class="mat-mdc-cell empty" [attr.colspan]="columns.length">
+          {{ loading() ? 'Loading…' : search.value ? 'No categories match this filter.' : 'No categories yet.' }}
+        </td>
+      </tr>
+    </table>
+  </div>
+</section>

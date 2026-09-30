@@ -31,7 +31,8 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req, null);
     }
 
-    @ExceptionHandler({ProductUnavailableException.class, InsufficientStockException.class})
+    @ExceptionHandler({ProductUnavailableException.class, InsufficientStockException.class,
+            OrderStatusConflictException.class})
     public ResponseEntity<ApiError> handleConflict(RuntimeException ex, HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req, null);
     }

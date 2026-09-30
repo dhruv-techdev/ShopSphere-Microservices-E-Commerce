@@ -10,7 +10,9 @@ public enum NotificationType {
     PAYMENT_FAILED,
     LOW_STOCK_ALERT,
     SHIPMENT_DISPATCHED,
-    SHIPMENT_DELIVERED;
+    SHIPMENT_DELIVERED,
+    EMAIL_VERIFICATION,
+    PASSWORD_RESET;
 
     /** US39 — Thymeleaf template, e.g. SHIPMENT_DISPATCHED → templates/email/shipment-dispatched.html */
     public String templateName() {

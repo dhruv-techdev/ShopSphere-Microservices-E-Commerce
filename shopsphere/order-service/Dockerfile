@@ -9,6 +9,10 @@ RUN mvn -N -f /workspace/pom.xml install
 COPY common-lib /workspace/common-lib
 RUN mvn -f /workspace/common-lib/pom.xml install -DskipTests
 
+# Layer 2b: security-lib (shared JWT auto-config) — needs common-lib + parent
+COPY security-lib /workspace/security-lib
+RUN mvn -f /workspace/security-lib/pom.xml install -DskipTests
+
 # Layer 3: target service
 ARG SERVICE_DIR
 COPY ${SERVICE_DIR} /workspace/${SERVICE_DIR}

@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -33,8 +34,9 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
-            summary = "Create a new product",
+            summary = "Create a new product (ADMIN)",
             description = """
                     Creates a product. `categoryId` is optional; if provided, the category must already exist.
                     `active` defaults to `true` when omitted.
@@ -44,6 +46,8 @@ public class ProductController {
             @ApiResponse(responseCode = "201", description = "Product created"),
             @ApiResponse(responseCode = "400", description = "Validation failed",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "ADMIN role required"),
             @ApiResponse(responseCode = "404", description = "Referenced category not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
@@ -111,14 +115,17 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
-            summary = "Update a product",
+            summary = "Update a product (ADMIN)",
             description = "Replaces the product's mutable fields. Pass `categoryId: null` to detach the category."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Product updated"),
             @ApiResponse(responseCode = "400", description = "Validation failed",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "ADMIN role required"),
             @ApiResponse(responseCode = "404", description = "Product or category not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
@@ -128,10 +135,13 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Delete a product")
+    @Operation(summary = "Delete a product (ADMIN)")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Product deleted"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "ADMIN role required"),
             @ApiResponse(responseCode = "404", description = "Product not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })

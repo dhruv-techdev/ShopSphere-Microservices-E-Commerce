@@ -26,10 +26,40 @@ spring:
         default_schema: shopsphere_users
     open-in-view: false
 
+  # US41 — auth tokens live in Redis (DB 1, separate from cart-service's carts in DB 0)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${AUTH_REDIS_DATABASE:1}
+      timeout: 2s
+
+  # US41 — account emails (verification / reset) are published for notification-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+
 app:
   jwt:
     secret: ${JWT_SECRET:change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256}
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    # US41 — short-lived access tokens; refresh tokens cover the session
+    expiration-ms: ${JWT_EXPIRATION_MS:900000}
+  auth:
+    require-verified-email: ${AUTH_REQUIRE_VERIFIED_EMAIL:true}
+    frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+    refresh-token-ttl: ${REFRESH_TOKEN_TTL:14d}
+    verification-token-ttl: ${VERIFICATION_TOKEN_TTL:24h}
+    password-reset-token-ttl: ${PASSWORD_RESET_TOKEN_TTL:30m}
+    request-cooldown: ${AUTH_REQUEST_COOLDOWN:60s}
+  internal:
+    token: ${INTERNAL_API_TOKEN:}
 
 management:
   endpoints:

@@ -1,0 +1,108 @@
+<header class="page-header">
+  <div>
+    <a mat-button routerLink="/products" class="back-link">
+      <mat-icon>arrow_back</mat-icon>
+      Products
+    </a>
+    <h1>{{ isEdit() ? (productName() ?? 'Edit product') : 'New product' }}</h1>
+  </div>
+  @if (isEdit() && !loadError()) {
+    <button mat-stroked-button type="button" class="danger-stroked" (click)="delete()" [disabled]="saving() || loading()" data-testid="delete-product">
+      <mat-icon>delete</mat-icon>
+      Delete
+    </button>
+  }
+</header>
+
+@if (loadError()) {
+  <div class="banner banner--error" role="alert" data-testid="load-error">
+    <span>{{ loadError() }}</span>
+    <a mat-button routerLink="/products">Back to products</a>
+  </div>
+} @else {
+  <mat-card appearance="outlined" class="form-card">
+    @if (loading() || saving()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    <mat-card-content>
+      @if (errorMessage()) {
+        <div class="banner banner--error" role="alert" data-testid="form-error">{{ errorMessage() }}</div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="save()" novalidate class="form-grid">
+        <mat-form-field appearance="outline" class="span-2">
+          <mat-label>Name</mat-label>
+          <input matInput formControlName="name" maxlength="200" required data-testid="name" />
+          @if (form.controls.name.hasError('required')) {
+            <mat-error>Name is required</mat-error>
+          } @else if (form.controls.name.hasError('server')) {
+            <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="span-2">
+          <mat-label>Description</mat-label>
+          <textarea matInput formControlName="description" rows="4" maxlength="2000"></textarea>
+          <mat-hint align="end">{{ form.controls.description.value.length }} / 2000</mat-hint>
+          @if (form.controls.description.hasError('server')) {
+            <mat-error>{{ form.controls.description.getError('server') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Price</mat-label>
+          <input matInput type="number" min="0.01" step="0.01" formControlName="price" required data-testid="price" />
+          @if (form.controls.price.hasError('required')) {
+            <mat-error>Price is required</mat-error>
+          } @else if (form.controls.price.hasError('min')) {
+            <mat-error>Price must be greater than 0</mat-error>
+          } @else if (form.controls.price.hasError('maxDecimals')) {
+            <mat-error>Use at most 2 decimal places</mat-error>
+          } @else if (form.controls.price.hasError('server')) {
+            <mat-error>{{ form.controls.price.getError('server') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Stock quantity</mat-label>
+          <input matInput type="number" min="0" step="1" formControlName="stockQuantity" required data-testid="stock" />
+          @if (form.controls.stockQuantity.hasError('required')) {
+            <mat-error>Stock quantity is required</mat-error>
+          } @else if (form.controls.stockQuantity.hasError('min')) {
+            <mat-error>Stock can't be negative</mat-error>
+          } @else if (form.controls.stockQuantity.hasError('integer')) {
+            <mat-error>Use a whole number</mat-error>
+          } @else if (form.controls.stockQuantity.hasError('server')) {
+            <mat-error>{{ form.controls.stockQuantity.getError('server') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Category</mat-label>
+          <mat-select formControlName="categoryId">
+            <mat-option [value]="null">No category</mat-option>
+            @for (category of categories(); track category.id) {
+              <mat-option [value]="category.id">{{ category.name }}</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.categoryId.hasError('server')) {
+            <mat-error>{{ form.controls.categoryId.getError('server') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <div class="toggle-field">
+          <mat-slide-toggle formControlName="active">
+            {{ form.controls.active.value ? 'Active — visible in the store' : 'Inactive — hidden from the store' }}
+          </mat-slide-toggle>
+        </div>
+
+        <div class="form-actions span-2">
+          <a mat-button routerLink="/products">Cancel</a>
+          <button mat-flat-button type="submit" [disabled]="saving() || loading()" data-testid="save">
+            {{ isEdit() ? 'Save changes' : 'Create product' }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+}

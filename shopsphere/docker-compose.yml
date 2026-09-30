@@ -44,19 +44,6 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: shopsphere-kafka
-    # ZooKeeper keeps its data across restarts, so after an unclean Kafka stop the old
-    # /brokers/ids/1 registration lingers until its session expires (~18s) and a fresh
-    # broker dies with NodeExistsException. Wait for it to clear, then start normally.
-    command:
-      - bash
-      - -c
-      - |
-        while timeout 10 zookeeper-shell zookeeper:2181 get /brokers/ids/1 2>/dev/null | grep -q '"host"'; do
-          echo "Waiting for stale broker registration in ZooKeeper to expire..."
-          sleep 3
-        done
-        exec /etc/confluent/docker/run
-    restart: on-failure
     depends_on:
       - zookeeper
     ports:
@@ -152,8 +139,18 @@ services:
       CONFIG_SERVER_URL: http://config-service:8888
       JWT_SECRET: change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-change-me}
+      # US41
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:29092
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+      AUTH_REQUIRE_VERIFIED_EMAIL: ${AUTH_REQUIRE_VERIFIED_EMAIL:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       service-registry:
         condition: service_healthy
@@ -328,6 +325,23 @@ services:
     depends_on:
       service-registry:
         condition: service_healthy
+
+  # ===================== Frontends =====================
+
+  # US43 — Angular admin console: http://localhost:4200
+  # nginx serves the SPA and proxies /api/* to the gateway (same origin, no CORS).
+  admin-app:
+    build:
+      context: ./admin-app
+      dockerfile: Dockerfile
+    container_name: shopsphere-admin
+    ports:
+      - "${ADMIN_APP_PORT:-4200}:80"
+    environment:
+      API_GATEWAY_URL: http://api-gateway:8080
+    depends_on:
+      api-gateway:
+        condition: service_started
 
 volumes:
   postgres-data:

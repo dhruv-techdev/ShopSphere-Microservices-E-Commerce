@@ -9,6 +9,12 @@
     <artifactId>api-gateway</artifactId>
     <packaging>jar</packaging>
 
+    <properties>
+        <!-- Spring Cloud Gateway 4.1.6 (Spring Cloud 2023.0.4) calls HttpHeaders.headerSet(), added in
+             Spring Framework 6.1.15; Boot 3.3.5 pins 6.1.14 → NoSuchMethodError on every proxied request. -->
+        <spring-framework.version>6.1.15</spring-framework.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.cloud</groupId>

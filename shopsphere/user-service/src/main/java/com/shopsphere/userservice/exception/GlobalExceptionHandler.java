@@ -3,6 +3,7 @@ package com.shopsphere.userservice.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -21,9 +22,20 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), req, null);
     }
 
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ApiError> handleInvalidCredentials(InvalidCredentialsException ex, HttpServletRequest req) {
+    @ExceptionHandler({InvalidCredentialsException.class, InvalidRefreshTokenException.class})
+    public ResponseEntity<ApiError> handleUnauthorized(RuntimeException ex, HttpServletRequest req) {
         return build(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage(), req, null);
+    }
+
+    /** US41 — correct password, unverified email. The error code lets clients offer "resend". */
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ApiError> handleEmailNotVerified(EmailNotVerifiedException ex, HttpServletRequest req) {
+        return build(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED", ex.getMessage(), req, null);
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ApiError> handleInvalidToken(InvalidTokenException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req, null);
     }
 
     @ExceptionHandler(UserNotFoundException.class)
@@ -43,6 +55,11 @@ public class GlobalExceptionHandler {
             fieldErrors.put(fe.getField(), fe.getDefaultMessage());
         }
         return build(HttpStatus.BAD_REQUEST, "Validation Failed", "Request validation failed", req, fieldErrors);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Bad Request", "Request body is missing or malformed", req, null);
     }
 
     @ExceptionHandler(Exception.class)
