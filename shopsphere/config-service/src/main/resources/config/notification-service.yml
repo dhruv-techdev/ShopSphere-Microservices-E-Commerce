@@ -1,4 +1,5 @@
-# Currently no service-specific overrides; placeholder for future use.
+# Shared (all environments). Channel is NOT set here on purpose: config-server values
+# override env vars, so the per-environment choice lives in the profile files / env.
 app:
   notification:
-    enabled: true
+    from-name: ShopSphere

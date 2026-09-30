@@ -33,6 +33,11 @@ public class JwtUtil {
                 .compact();
     }
 
+    /** US41 — access-token lifetime, reported to clients as expiresIn. */
+    public long getExpirationMs() {
+        return expirationMs;
+    }
+
     public String extractEmail(String token) {
         return parseClaims(token).getSubject();
     }

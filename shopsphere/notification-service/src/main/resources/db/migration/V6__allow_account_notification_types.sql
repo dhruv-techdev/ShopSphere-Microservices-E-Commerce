@@ -1,0 +1,15 @@
+-- V6 (US41): allow EMAIL_VERIFICATION and PASSWORD_RESET.
+
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN (
+    'ORDER_PLACED',
+    'ORDER_CANCELLED',
+    'PAYMENT_SUCCESSFUL',
+    'PAYMENT_FAILED',
+    'LOW_STOCK_ALERT',
+    'SHIPMENT_DISPATCHED',
+    'SHIPMENT_DELIVERED',
+    'EMAIL_VERIFICATION',
+    'PASSWORD_RESET'
+));

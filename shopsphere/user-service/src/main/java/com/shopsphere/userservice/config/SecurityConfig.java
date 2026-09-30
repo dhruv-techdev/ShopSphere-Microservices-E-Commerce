@@ -33,7 +33,9 @@ public class SecurityConfig {
                                 "/actuator/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                // US39 — service-to-service; protected by X-Internal-Token in the controller
+                                "/internal/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

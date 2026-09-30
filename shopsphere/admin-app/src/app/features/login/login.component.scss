@@ -1,0 +1,63 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: linear-gradient(160deg, #eef2ff 0%, #f6f7fb 60%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.brand-icon {
+  font-size: 40px;
+  width: 40px;
+  height: 40px;
+  color: #1f5fbf;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.submit {
+  height: 44px;
+  margin-top: 8px;
+}
+
+.submit mat-progress-spinner {
+  display: inline-block;
+}
+
+.banner {
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 16px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.banner--error {
+  background: #fdecea;
+  color: #8a1c1c;
+}
+
+.banner--info {
+  background: #e8f0fe;
+  color: #1a3d8f;
+}

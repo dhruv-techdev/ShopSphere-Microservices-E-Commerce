@@ -1,5 +1,6 @@
 package com.shopsphere.userservice.service;
 
+import com.shopsphere.userservice.dto.UserContactResponse;
 import com.shopsphere.userservice.dto.UserResponse;
 import com.shopsphere.userservice.entity.User;
 import com.shopsphere.userservice.exception.UserNotFoundException;
@@ -27,5 +28,13 @@ public class UserService {
                 .enabled(user.getEnabled())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    /** US39 — used by notification-service to address emails. */
+    @Transactional(readOnly = true)
+    public UserContactResponse getContact(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("id=" + userId));
+        return new UserContactResponse(user.getId(), user.getEmail(), user.getFirstName(), user.getEnabled());
     }
 }

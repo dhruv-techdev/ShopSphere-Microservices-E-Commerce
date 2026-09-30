@@ -30,6 +30,12 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+        <!-- US42: JWT verification + @PreAuthorize -->
+        <dependency>
+            <groupId>com.shopsphere</groupId>
+            <artifactId>security-lib</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>

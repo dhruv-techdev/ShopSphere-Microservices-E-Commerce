@@ -1,14 +1,15 @@
 package com.shopsphere.userservice.service;
 
+import com.shopsphere.userservice.config.AuthProperties;
 import com.shopsphere.userservice.dto.AuthResponse;
 import com.shopsphere.userservice.dto.LoginRequest;
 import com.shopsphere.userservice.dto.RegisterRequest;
 import com.shopsphere.userservice.entity.Role;
 import com.shopsphere.userservice.entity.User;
 import com.shopsphere.userservice.exception.DuplicateEmailException;
+import com.shopsphere.userservice.exception.EmailNotVerifiedException;
 import com.shopsphere.userservice.exception.InvalidCredentialsException;
 import com.shopsphere.userservice.repository.UserRepository;
-import com.shopsphere.userservice.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,9 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
+    private final RefreshTokenService refreshTokenService;
+    private final EmailVerificationService emailVerificationService;
+    private final AuthProperties authProperties;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -35,12 +38,24 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole() == null ? Role.CUSTOMER : request.getRole())
                 .enabled(Boolean.TRUE)
+                .emailVerified(Boolean.FALSE)
                 .build();
 
         User saved = userRepository.save(user);
-        String token = jwtUtil.generateToken(saved.getEmail(), saved.getId(), saved.getRole().name());
+        emailVerificationService.sendVerification(saved);   // emailed after commit
 
-        return toAuthResponse(saved, token);
+        if (authProperties.isRequireVerifiedEmail()) {
+            return AuthResponse.builder()
+                    .userId(saved.getId())
+                    .email(saved.getEmail())
+                    .firstName(saved.getFirstName())
+                    .lastName(saved.getLastName())
+                    .role(saved.getRole())
+                    .emailVerified(Boolean.FALSE)
+                    .message("Account created. Check your email to verify your address before logging in.")
+                    .build();
+        }
+        return refreshTokenService.issue(saved);
     }
 
     @Transactional(readOnly = true)
@@ -56,18 +71,19 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        String token = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole().name());
-        return toAuthResponse(user, token);
+        // Checked only after the password, so verification state isn't revealed to strangers.
+        if (authProperties.isRequireVerifiedEmail() && !Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new EmailNotVerifiedException();
+        }
+
+        return refreshTokenService.issue(user);
     }
 
-    private AuthResponse toAuthResponse(User user, String token) {
-        return AuthResponse.builder()
-                .userId(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .role(user.getRole())
-                .token(token)
-                .build();
+    public AuthResponse refresh(String refreshToken) {
+        return refreshTokenService.rotate(refreshToken);
+    }
+
+    public void logout(String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
     }
 }

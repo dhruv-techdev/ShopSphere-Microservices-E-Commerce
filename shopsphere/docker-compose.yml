@@ -44,9 +44,6 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: shopsphere-kafka
-    # On a quick restart ZooKeeper may still hold the old broker registration (NodeExists)
-    # until its session times out (~18s); retrying lets Kafka come up once it expires.
-    restart: on-failure
     depends_on:
       - zookeeper
     ports:
@@ -63,6 +60,14 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
+
+  # US39 — local SMTP catcher. Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: shopsphere-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
   # ===================== Platform services =====================
 
@@ -133,8 +138,19 @@ services:
       EUREKA_URL: http://service-registry:8761/eureka/
       CONFIG_SERVER_URL: http://config-service:8888
       JWT_SECRET: change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-change-me}
+      # US41
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:29092
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+      AUTH_REQUIRE_VERIFIED_EMAIL: ${AUTH_REQUIRE_VERIFIED_EMAIL:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       service-registry:
         condition: service_healthy
@@ -244,6 +260,15 @@ services:
       KAFKA_BOOTSTRAP: kafka:29092
       EUREKA_URL: http://service-registry:8761/eureka/
       CONFIG_SERVER_URL: http://config-service:8888
+      # US39 — real delivery in Docker goes to Mailpit
+      NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-smtp}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      NOTIFICATION_FROM: no-reply@shopsphere.local
+      NOTIFICATION_ADMIN_EMAIL: ops@shopsphere.local
+      USER_SERVICE_URL: http://user-service:8082
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-change-me}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -251,6 +276,8 @@ services:
         condition: service_healthy
       service-registry:
         condition: service_healthy
+      mailpit:
+        condition: service_started
 
   shipping-service:
     build:
@@ -298,6 +325,23 @@ services:
     depends_on:
       service-registry:
         condition: service_healthy
+
+  # ===================== Frontends =====================
+
+  # US43 — Angular admin console: http://localhost:4200
+  # nginx serves the SPA and proxies /api/* to the gateway (same origin, no CORS).
+  admin-app:
+    build:
+      context: ./admin-app
+      dockerfile: Dockerfile
+    container_name: shopsphere-admin
+    ports:
+      - "${ADMIN_APP_PORT:-4200}:80"
+    environment:
+      API_GATEWAY_URL: http://api-gateway:8080
+    depends_on:
+      api-gateway:
+        condition: service_started
 
 volumes:
   postgres-data:

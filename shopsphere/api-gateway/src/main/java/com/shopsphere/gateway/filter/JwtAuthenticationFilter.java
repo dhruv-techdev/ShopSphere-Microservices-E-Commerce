@@ -14,74 +14,87 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Validates the JWT at the edge and propagates identity downstream.
+ *
+ * <p>US42 hardening:
+ * <ul>
+ *   <li>Client-supplied X-User-Id / X-User-Role / X-User-Email are stripped on EVERY request
+ *       (public ones included) — they are only ever set from a validated token.</li>
+ *   <li>The Authorization header is forwarded unchanged so services verify it again
+ *       (security-lib) — the gateway is not the only line of defence.</li>
+ *   <li>{@code admin-prefixes} make whole path trees ADMIN-only for every method.</li>
+ * </ul>
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    static final String USER_ID = "X-User-Id";
+    static final String USER_ROLE = "X-User-Role";
+    static final String USER_EMAIL = "X-User-Email";
+    private static final List<String> IDENTITY_HEADERS = List.of(USER_ID, USER_ROLE, USER_EMAIL);
 
     private final JwtUtil jwtUtil;
     private final SecurityPaths securityPaths;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        ServerHttpRequest request = exchange.getRequest();
-        String path = request.getURI().getPath();
-        String method = request.getMethod() == null ? "GET" : request.getMethod().name();
+        ServerHttpRequest original = exchange.getRequest();
+        String path = original.getURI().getPath();
+        String method = original.getMethod() == null ? "GET" : original.getMethod().name();
 
-        // ST2 — public routes pass through untouched
+        // Never trust identity headers coming from the client.
+        ServerHttpRequest sanitized = original.mutate()
+                .headers(headers -> IDENTITY_HEADERS.forEach(headers::remove))
+                .build();
+
         if (securityPaths.isPublic(path, method)) {
-            return chain.filter(exchange);
+            return chain.filter(exchange.mutate().request(sanitized).build());
         }
 
-        // Authorization header required for everything else
-        String authHeader = request.getHeaders().getFirst("Authorization");
+        String authHeader = original.getHeaders().getFirst("Authorization");
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            return unauthorized(exchange, "Missing or malformed Authorization header");
+            return reject(exchange, HttpStatus.UNAUTHORIZED, "Missing or malformed Authorization header");
         }
 
-        String token = authHeader.substring(BEARER_PREFIX.length());
         Claims claims;
         try {
-            claims = jwtUtil.parseAndValidate(token);
+            claims = jwtUtil.parseAndValidate(authHeader.substring(BEARER_PREFIX.length()));
         } catch (Exception ex) {
             log.debug("JWT validation failed for {} {}: {}", method, path, ex.getMessage());
-            return unauthorized(exchange, "Invalid or expired JWT");
+            return reject(exchange, HttpStatus.UNAUTHORIZED, "Invalid or expired JWT");
         }
 
-        // ST5 — extract user id and role
         Long userId = claims.get("userId", Long.class);
         String role = claims.get("role", String.class);
         String email = claims.getSubject();
-
         if (userId == null || role == null) {
-            return unauthorized(exchange, "JWT missing required claims");
+            return reject(exchange, HttpStatus.UNAUTHORIZED, "JWT missing required claims");
+        }
+        role = role.toUpperCase(Locale.ROOT);
+
+        if (securityPaths.requiresAdmin(path, method) && !"ADMIN".equals(role)) {
+            log.info("Forbidden: userId={} role={} attempted {} {}", userId, role, method, path);
+            return reject(exchange, HttpStatus.FORBIDDEN, "ADMIN role required for " + method + " " + path);
         }
 
-        // ST4 — admin-only enforcement on write methods
-        if (securityPaths.requiresAdmin(path, method) && !"ADMIN".equalsIgnoreCase(role)) {
-            return forbidden(exchange, "ADMIN role required for " + method + " " + path);
-        }
-
-        // ST6 — propagate user context to downstream services as headers
-        ServerHttpRequest mutated = request.mutate()
-                .header("X-User-Id", String.valueOf(userId))
-                .header("X-User-Role", role)
-                .header("X-User-Email", email)
+        ServerHttpRequest authenticated = sanitized.mutate()
+                .header(USER_ID, String.valueOf(userId))
+                .header(USER_ROLE, role)
+                .header(USER_EMAIL, email == null ? "" : email)
                 .build();
 
-        return chain.filter(exchange.mutate().request(mutated).build());
+        return chain.filter(exchange.mutate().request(authenticated).build());
     }
 
-    private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        exchange.getResponse().getHeaders().add("X-Gateway-Error", message);
-        return exchange.getResponse().setComplete();
-    }
-
-    private Mono<Void> forbidden(ServerWebExchange exchange, String message) {
-        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+    private Mono<Void> reject(ServerWebExchange exchange, HttpStatus status, String message) {
+        exchange.getResponse().setStatusCode(status);
         exchange.getResponse().getHeaders().add("X-Gateway-Error", message);
         return exchange.getResponse().setComplete();
     }

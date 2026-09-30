@@ -1,0 +1,61 @@
+<main class="login-page">
+  <mat-card class="login-card" appearance="outlined">
+    <mat-card-header>
+      <mat-icon mat-card-avatar class="brand-icon">storefront</mat-icon>
+      <mat-card-title>ShopSphere Admin</mat-card-title>
+      <mat-card-subtitle>Sign in with your administrator account</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (notice()) {
+        <div class="banner banner--info" role="status" data-testid="login-notice">{{ notice() }}</div>
+      }
+      @if (errorMessage()) {
+        <div class="banner banner--error" role="alert" data-testid="login-error">{{ errorMessage() }}</div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email" autocomplete="username" required />
+          @if (form.controls.email.hasError('required')) {
+            <mat-error>Email is required</mat-error>
+          } @else if (form.controls.email.hasError('email')) {
+            <mat-error>Enter a valid email address</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            [type]="hidePassword() ? 'password' : 'text'"
+            formControlName="password"
+            autocomplete="current-password"
+            required
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="hidePassword.set(!hidePassword())"
+            [attr.aria-label]="hidePassword() ? 'Show password' : 'Hide password'"
+          >
+            <mat-icon>{{ hidePassword() ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+          @if (form.controls.password.hasError('required')) {
+            <mat-error>Password is required</mat-error>
+          }
+        </mat-form-field>
+
+        <button mat-flat-button type="submit" class="submit" [disabled]="submitting()" data-testid="login-submit">
+          @if (submitting()) {
+            <mat-progress-spinner mode="indeterminate" [diameter]="20" />
+          } @else {
+            Sign in
+          }
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</main>
