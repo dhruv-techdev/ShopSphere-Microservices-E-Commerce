@@ -1,5 +1,6 @@
 package com.shopsphere.cartservice.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +18,8 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
+// getTotal()/getItemCount() are written to Redis as "total"/"itemCount" but have no setters.
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Cart implements Serializable {
 
     /** Owning customer's user id (acts as the Redis key suffix). */
