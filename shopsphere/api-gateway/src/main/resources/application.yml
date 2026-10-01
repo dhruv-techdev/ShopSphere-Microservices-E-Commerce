@@ -85,6 +85,12 @@ spring:
           predicates:
             - Path=/api/v1/shipments/**
 
+        # ---------- Recommendation Service (Python, US63) — resolved through Eureka ----------
+        - id: recommendation-service
+          uri: ${RECOMMENDATION_SERVICE_URL:lb://recommendation-service}
+          predicates:
+            - Path=/api/v1/recommendations/**
+
 app:
   jwt:
     secret: ${JWT_SECRET:change-me-to-a-long-random-secret-of-at-least-256-bits-for-hs256}
@@ -107,11 +113,13 @@ app:
       - /api/v1/payments/health
       - /api/v1/notifications/health
       - /api/v1/shipments/health
+      - /api/v1/recommendations/health
       - /actuator/health
     # GET on these path prefixes is public (browsing catalog without login)
     public-get-prefixes:
       - /api/v1/products
       - /api/v1/categories
+      - /api/v1/recommendations
     # Admin-only path prefixes (POST/PUT/DELETE → ADMIN required)
     admin-write-prefixes:
       - /api/v1/products

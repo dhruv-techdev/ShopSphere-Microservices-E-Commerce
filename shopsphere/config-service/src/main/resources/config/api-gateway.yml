@@ -17,10 +17,12 @@ app:
       - /api/v1/payments/health
       - /api/v1/notifications/health
       - /api/v1/shipments/health
+      - /api/v1/recommendations/health
       - /actuator/health
     public-get-prefixes:
       - /api/v1/products
       - /api/v1/categories
+      - /api/v1/recommendations
     admin-write-prefixes:
       - /api/v1/products
       - /api/v1/categories
