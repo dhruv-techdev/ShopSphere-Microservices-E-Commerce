@@ -17,7 +17,7 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
 
     private readonly ShippingDbContext _db;
     private readonly FakeShipmentEventPublisher _publisher = new();
-    private readonly PaymentSuccessfulHandler _handler;
+    private readonly FixedTimeProvider _time = new(Now);
 
     public PaymentSuccessfulHandlerTests()
     {
@@ -25,21 +25,27 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
             .UseInMemoryDatabase($"handler-{Guid.NewGuid()}")
             .Options;
         _db = new ShippingDbContext(dbOptions);
-
-        var shippingOptions = MsOptions.Create(new ShippingOptions { DefaultCarrier = "ShopSphere Express", TrackingPrefix = "SSX" });
-        var time = new FixedTimeProvider(Now);
-        var outbox = new ShipmentEventOutbox(_db, _publisher, time, NullLogger<ShipmentEventOutbox>.Instance);
-
-        _handler = new PaymentSuccessfulHandler(
-            _db,
-            new TrackingNumberGenerator(shippingOptions, time),
-            outbox,
-            shippingOptions,
-            time,
-            NullLogger<PaymentSuccessfulHandler>.Instance);
     }
 
     public void Dispose() => _db.Dispose();
+
+    private PaymentSuccessfulHandler Handler(bool autoDispatch = false)
+    {
+        var shippingOptions = MsOptions.Create(new ShippingOptions
+        {
+            DefaultCarrier = "ShopSphere Express",
+            TrackingPrefix = "SSX",
+            AutoDispatch = autoDispatch
+        });
+        var outbox = new ShipmentEventOutbox(_db, _publisher, _time, NullLogger<ShipmentEventOutbox>.Instance);
+        return new PaymentSuccessfulHandler(
+            _db,
+            new TrackingNumberGenerator(shippingOptions, _time),
+            outbox,
+            shippingOptions,
+            _time,
+            NullLogger<PaymentSuccessfulHandler>.Instance);
+    }
 
     private static EventAddress Address(string country = "CA") =>
         new("Jane Doe", "+1 416 555 0199", "123 King St W", null, "Toronto", "ON", "M5V 3L9", country);
@@ -47,24 +53,56 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
     private static PaymentSuccessfulEvent Event(string eventId = "evt-1", long orderId = 42, long userId = 7, EventAddress? address = null) =>
         new(eventId, PaymentSuccessfulEvent.Type, orderId, userId, "pay-ref", 100.00m, address ?? Address());
 
+    /* ------------------------ manual dispatch (default) ------------------------ */
+
     [Fact]
-    public async Task NewEvent_CreatesShippedShipmentWithTracking_AndPublishesDispatched()
+    public async Task NewEvent_ByDefault_CreatesPendingShipment_WithoutPublishing()
     {
-        var outcome = await _handler.HandleAsync(Event(), CancellationToken.None);
+        var outcome = await Handler().HandleAsync(Event(), CancellationToken.None);
 
         Assert.Equal(HandleOutcome.Created, outcome);
 
         var shipment = await _db.Shipments.SingleAsync();
         Assert.Equal(42, shipment.OrderId);
         Assert.Equal(7, shipment.UserId);
+        Assert.Equal(ShipmentStatus.Pending, shipment.Status);
+        Assert.Null(shipment.Carrier);
+        Assert.Null(shipment.TrackingNumber);
+        Assert.Null(shipment.ShippedAt);
+        Assert.Null(shipment.DispatchPublishedAt);
+        Assert.Equal("Toronto", shipment.ShippingAddress.City);
+
+        Assert.True(await _db.ProcessedEvents.AnyAsync(p => p.EventId == "evt-1"));
+        Assert.Empty(_publisher.Attempts);
+    }
+
+    [Fact]
+    public async Task SameEventTwice_ByDefault_CreatesOneShipment_AndNeverPublishes()
+    {
+        var handler = Handler();
+        await handler.HandleAsync(Event(), CancellationToken.None);
+        var second = await handler.HandleAsync(Event(), CancellationToken.None);
+
+        Assert.Equal(HandleOutcome.Duplicate, second);
+        Assert.Equal(1, await _db.Shipments.CountAsync());
+        Assert.Empty(_publisher.Attempts);
+    }
+
+    /* ------------------------------ auto dispatch ------------------------------ */
+
+    [Fact]
+    public async Task NewEvent_AutoDispatch_CreatesShippedShipmentWithTracking_AndPublishesDispatched()
+    {
+        var outcome = await Handler(autoDispatch: true).HandleAsync(Event(), CancellationToken.None);
+
+        Assert.Equal(HandleOutcome.Created, outcome);
+
+        var shipment = await _db.Shipments.SingleAsync();
         Assert.Equal(ShipmentStatus.Shipped, shipment.Status);
         Assert.Equal("ShopSphere Express", shipment.Carrier);
         Assert.Matches("^SSX260926[0-9A-HJKMNP-TV-Z]{10}$", shipment.TrackingNumber);
         Assert.Equal(Now, shipment.ShippedAt);
         Assert.Equal(Now, shipment.DispatchPublishedAt);
-        Assert.Equal("Toronto", shipment.ShippingAddress.City);
-
-        Assert.True(await _db.ProcessedEvents.AnyAsync(p => p.EventId == "evt-1"));
 
         var dispatched = Assert.Single(_publisher.Published);
         Assert.Equal(ShipmentDispatchedEvent.Type, dispatched.EventType);
@@ -76,10 +114,11 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task SameEventTwice_CreatesOneShipment_AndPublishesOnce()
+    public async Task SameEventTwice_AutoDispatch_CreatesOneShipment_AndPublishesOnce()
     {
-        await _handler.HandleAsync(Event(), CancellationToken.None);
-        var second = await _handler.HandleAsync(Event(), CancellationToken.None);
+        var handler = Handler(autoDispatch: true);
+        await handler.HandleAsync(Event(), CancellationToken.None);
+        var second = await handler.HandleAsync(Event(), CancellationToken.None);
 
         Assert.Equal(HandleOutcome.Duplicate, second);
         Assert.Equal(1, await _db.Shipments.CountAsync());
@@ -89,8 +128,9 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
     [Fact]
     public async Task DifferentEventForSameOrder_DoesNotCreateSecondShipment()
     {
-        await _handler.HandleAsync(Event(eventId: "evt-1"), CancellationToken.None);
-        var second = await _handler.HandleAsync(Event(eventId: "evt-2"), CancellationToken.None);
+        var handler = Handler(autoDispatch: true);
+        await handler.HandleAsync(Event(eventId: "evt-1"), CancellationToken.None);
+        var second = await handler.HandleAsync(Event(eventId: "evt-2"), CancellationToken.None);
 
         Assert.Equal(HandleOutcome.Duplicate, second);
         Assert.Equal(1, await _db.Shipments.CountAsync());
@@ -101,16 +141,17 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
     [Fact]
     public async Task PublishFails_ThenRedelivered_RepublishesWithSameEventId()
     {
+        var handler = Handler(autoDispatch: true);
         _publisher.FailNext = true;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _handler.HandleAsync(Event(), CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(Event(), CancellationToken.None));
 
         var shipment = await _db.Shipments.SingleAsync();
         Assert.Null(shipment.DispatchPublishedAt);
         Assert.Empty(_publisher.Published);
 
         // Offset was not committed → Kafka redelivers the same event.
-        var outcome = await _handler.HandleAsync(Event(), CancellationToken.None);
+        var outcome = await handler.HandleAsync(Event(), CancellationToken.None);
 
         Assert.Equal(HandleOutcome.Duplicate, outcome);
         Assert.Equal(1, await _db.Shipments.CountAsync());
@@ -120,12 +161,14 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
         Assert.NotNull((await _db.Shipments.SingleAsync()).DispatchPublishedAt);
     }
 
+    /* ------------------------------- bad input ------------------------------- */
+
     [Fact]
     public async Task MissingAddress_SkipsAndRecordsEvent()
     {
         var evt = new PaymentSuccessfulEvent("evt-no-addr", PaymentSuccessfulEvent.Type, 43, 7, "ref", 10m, null);
 
-        var outcome = await _handler.HandleAsync(evt, CancellationToken.None);
+        var outcome = await Handler().HandleAsync(evt, CancellationToken.None);
 
         Assert.Equal(HandleOutcome.SkippedNoAddress, outcome);
         Assert.Empty(await _db.Shipments.ToListAsync());
@@ -136,7 +179,7 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
     [Fact]
     public async Task InvalidAddress_SkipsAndRecordsEvent()
     {
-        var outcome = await _handler.HandleAsync(Event(eventId: "evt-bad-addr", address: Address(country: "CAN")), CancellationToken.None);
+        var outcome = await Handler().HandleAsync(Event(eventId: "evt-bad-addr", address: Address(country: "CAN")), CancellationToken.None);
 
         Assert.Equal(HandleOutcome.SkippedNoAddress, outcome);
         Assert.Empty(await _db.Shipments.ToListAsync());
@@ -151,7 +194,7 @@ public sealed class PaymentSuccessfulHandlerTests : IDisposable
     {
         var evt = new PaymentSuccessfulEvent(eventId, PaymentSuccessfulEvent.Type, orderId, userId, "ref", 10m, Address());
 
-        await Assert.ThrowsAsync<InvalidEventException>(() => _handler.HandleAsync(evt, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidEventException>(() => Handler().HandleAsync(evt, CancellationToken.None));
         Assert.Empty(await _db.Shipments.ToListAsync());
     }
 }

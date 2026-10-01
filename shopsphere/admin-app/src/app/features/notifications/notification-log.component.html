@@ -1,0 +1,117 @@
+<header class="page-header">
+  <div>
+    <h1>Notifications</h1>
+    <p class="muted">{{ summary()?.total ?? page().totalElements }} emails recorded by notification-service</p>
+  </div>
+  <button mat-icon-button type="button" (click)="reload()" [disabled]="loading()" aria-label="Refresh">
+    <mat-icon>refresh</mat-icon>
+  </button>
+</header>
+
+<form class="filters filters--stacked" [formGroup]="filters" novalidate>
+  <mat-chip-listbox formControlName="status" aria-label="Filter by delivery status" [hideSingleSelectionIndicator]="true">
+    <mat-chip-option [value]="all">All</mat-chip-option>
+    @for (status of statuses; track status) {
+      <mat-chip-option [value]="status" [attr.data-testid]="'status-' + status">
+        {{ status }} <span class="chip-count">{{ count(status) }}</span>
+      </mat-chip-option>
+    }
+  </mat-chip-listbox>
+
+  <div class="filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Type</mat-label>
+      <mat-select formControlName="type">
+        <mat-option [value]="null">Any type</mat-option>
+        @for (t of types; track t) {
+          <mat-option [value]="t">{{ label(t) }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="filters__search" subscriptSizing="dynamic">
+      <mat-label>Recipient email</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput formControlName="recipient" autocomplete="off" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="filters__price" subscriptSizing="dynamic">
+      <mat-label>User ID</mat-label>
+      <input matInput type="number" min="1" formControlName="userId" data-testid="notif-user-filter" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="filters__price" subscriptSizing="dynamic">
+      <mat-label>Order #</mat-label>
+      <input matInput type="number" min="1" formControlName="orderId" />
+    </mat-form-field>
+  </div>
+</form>
+
+@if (error()) {
+  <div class="banner banner--error" role="alert" data-testid="list-error">
+    <span>{{ error() }}</span>
+    <button mat-button type="button" (click)="reload()">Retry</button>
+  </div>
+}
+
+<section class="table-card">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  <div class="table-scroll">
+    <table mat-table [dataSource]="page().content">
+      <ng-container matColumnDef="createdAt">
+        <th mat-header-cell *matHeaderCellDef>When</th>
+        <td mat-cell *matCellDef="let n">{{ n.createdAt | date: 'medium' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef>Type</th>
+        <td mat-cell *matCellDef="let n">{{ label(n.type) }}</td>
+      </ng-container>
+      <ng-container matColumnDef="recipient">
+        <th mat-header-cell *matHeaderCellDef>Recipient</th>
+        <td mat-cell *matCellDef="let n">
+          {{ n.recipient ?? '—' }}
+          @if (n.userId) {
+            <div class="cell-sub">user #{{ n.userId }}</div>
+          }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="subject">
+        <th mat-header-cell *matHeaderCellDef>Subject</th>
+        <td mat-cell *matCellDef="let n">
+          <div>{{ n.subject }}</div>
+          @if (n.failureReason) {
+            <div class="cell-sub failure-text">{{ n.failureReason }}</div>
+          }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let n"><span [class]="chip(n.deliveryStatus)">{{ n.deliveryStatus }}</span></td>
+      </ng-container>
+      <ng-container matColumnDef="attempts">
+        <th mat-header-cell *matHeaderCellDef class="num">Attempts</th>
+        <td mat-cell *matCellDef="let n" class="num">{{ n.attempts }}</td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr
+        mat-row
+        *matRowDef="let row; columns: columns"
+        class="clickable-row"
+        tabindex="0"
+        (click)="open(row)"
+        (keydown.enter)="open(row)"
+        data-testid="notification-row"
+      ></tr>
+      <tr class="mat-mdc-row" *matNoDataRow>
+        <td class="mat-mdc-cell empty" [attr.colspan]="columns.length">{{ loading() ? 'Loading…' : 'No notifications match these filters.' }}</td>
+      </tr>
+    </table>
+  </div>
+  <mat-paginator
+    [length]="page().totalElements"
+    [pageIndex]="page().page"
+    [pageSize]="page().size || 25"
+    [pageSizeOptions]="[25, 50, 100]"
+    (page)="onPage($event)"
+    aria-label="Notification pages"
+  />
+</section>

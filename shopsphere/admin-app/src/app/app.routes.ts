@@ -42,6 +42,39 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/catalog/products/product-form.component').then((m) => m.ProductFormComponent),
       },
+      // US45 — order management
+      {
+        path: 'orders',
+        title: 'Orders · ShopSphere Admin',
+        loadComponent: () => import('./features/orders/order-list.component').then((m) => m.OrderListComponent),
+      },
+      {
+        path: 'orders/:id',
+        title: 'Order · ShopSphere Admin',
+        loadComponent: () => import('./features/orders/order-detail.component').then((m) => m.OrderDetailComponent),
+      },
+      // US46 — operations dashboards
+      {
+        path: 'inventory/low-stock',
+        title: 'Low stock · ShopSphere Admin',
+        loadComponent: () => import('./features/inventory/low-stock.component').then((m) => m.LowStockComponent),
+      },
+      {
+        path: 'payments',
+        title: 'Payments · ShopSphere Admin',
+        loadComponent: () => import('./features/payments/payments.component').then((m) => m.PaymentsComponent),
+      },
+      {
+        path: 'users',
+        title: 'Users · ShopSphere Admin',
+        loadComponent: () => import('./features/users/user-list.component').then((m) => m.UserListComponent),
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications · ShopSphere Admin',
+        loadComponent: () =>
+          import('./features/notifications/notification-log.component').then((m) => m.NotificationLogComponent),
+      },
       {
         path: 'categories',
         title: 'Categories · ShopSphere Admin',

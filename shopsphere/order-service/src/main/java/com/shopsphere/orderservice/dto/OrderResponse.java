@@ -2,6 +2,7 @@ package com.shopsphere.orderservice.dto;
 
 import com.shopsphere.orderservice.entity.CancellationReason;
 import com.shopsphere.orderservice.entity.OrderStatus;
+import com.shopsphere.orderservice.entity.PaymentState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,6 +34,12 @@ public class OrderResponse {
     private CancellationReason cancellationReason;
     private String cancellationDescription;
     private Instant cancelledAt;
+    /** US45 — payment outcome from payment.successful / payment.failed. */
+    private PaymentState paymentState;
+    private String paymentReference;
+    private Instant paidAt;
+    private Instant paymentFailedAt;
+    private String paymentFailureReason;
     private List<OrderItemResponse> items;
     private Instant createdAt;
     private Instant updatedAt;

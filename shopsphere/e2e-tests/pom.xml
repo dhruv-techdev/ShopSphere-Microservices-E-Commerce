@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      US47 — browser end-to-end suite for the admin console.
+      Deliberately NOT a module of shopsphere/pom.xml: it needs the whole stack running,
+      so `mvn verify` on the parent stays a pure unit/integration build.
+    -->
+    <groupId>com.shopsphere</groupId>
+    <artifactId>e2e-tests</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>ShopSphere :: E2E tests (Selenium + TestNG)</name>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <selenium.version>4.25.0</selenium.version>
+        <testng.version>7.10.2</testng.version>
+        <jackson.version>2.17.2</jackson.version>
+
+        <!-- Override with -De2e.suite=... to run a subset -->
+        <e2e.suite>src/test/resources/testng.xml</e2e.suite>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>${selenium.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>${testng.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-Xlint:all,-processing,-classfile</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+                    <suiteXmlFiles>
+                        <suiteXmlFile>${e2e.suite}</suiteXmlFile>
+                    </suiteXmlFiles>
+                    <!-- -De2e.* flags on the mvn command line are forwarded to the forked JVM -->
+                    <trimStackTrace>false</trimStackTrace>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,231 @@
+<header class="page-header">
+  <div>
+    <a mat-button routerLink="/orders" class="back-link">
+      <mat-icon>arrow_back</mat-icon>
+      Orders
+    </a>
+    @if (order(); as o) {
+      <h1 class="title-row">
+        Order #{{ o.id }}
+        <span [class]="statusChip(o.status)" data-testid="order-status">{{ statusLabel(o.status) }}</span>
+      </h1>
+      <p class="muted">Placed {{ o.createdAt | date: 'medium' }} · customer #{{ o.userId }}</p>
+    } @else {
+      <h1>Order</h1>
+    }
+  </div>
+
+  @if (order()) {
+    <div class="header-actions">
+      <button mat-icon-button type="button" (click)="reload()" [disabled]="loading()" matTooltip="Refresh" aria-label="Refresh">
+        <mat-icon>refresh</mat-icon>
+      </button>
+      @if (canCancel()) {
+        <button mat-stroked-button type="button" class="danger-stroked" (click)="cancelOrder()" [disabled]="busy()" data-testid="cancel-order">
+          Cancel order
+        </button>
+      }
+      @if (canDeliver()) {
+        <button mat-flat-button type="button" (click)="deliver()" [disabled]="busy()" data-testid="deliver">
+          <mat-icon>where_to_vote</mat-icon>
+          Mark as delivered
+        </button>
+      }
+      @if (canShip()) {
+        <button mat-flat-button type="button" (click)="ship()" [disabled]="busy()" data-testid="ship">
+          <mat-icon>local_shipping</mat-icon>
+          Mark as shipped
+        </button>
+      }
+    </div>
+  }
+</header>
+
+@if (loading() || busy() || syncing()) {
+  <mat-progress-bar mode="indeterminate" class="page-progress" />
+}
+
+@if (loadError()) {
+  <div class="banner banner--error" role="alert" data-testid="load-error">
+    <span>{{ loadError() }}</span>
+    <a mat-button routerLink="/orders">Back to orders</a>
+  </div>
+}
+
+@if (order(); as o) {
+  @if (syncing()) {
+    <div class="banner banner--info" role="status" data-testid="syncing">Waiting for the order to pick up the shipment update…</div>
+  }
+  @if (syncNote()) {
+    <div class="banner banner--info" role="status" data-testid="sync-note">
+      <span>{{ syncNote() }}</span>
+      <button mat-button type="button" (click)="reload()">Refresh</button>
+    </div>
+  }
+  @if (refundNeeded()) {
+    <div class="banner banner--error" role="alert" data-testid="refund-needed">
+      This order was cancelled after it was paid. Refunds are not automated yet — refund payment
+      {{ o.paymentReference ?? '' }} manually.
+    </div>
+  }
+
+  <div class="detail-grid">
+    <mat-card appearance="outlined" class="detail-main">
+      <mat-card-header>
+        <mat-card-title>Items</mat-card-title>
+        <mat-card-subtitle>{{ o.itemCount }} {{ o.itemCount === 1 ? 'item' : 'items' }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th class="num">Unit price</th>
+              <th class="num">Qty</th>
+              <th class="num">Line total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of o.items; track item.id) {
+              <tr data-testid="item-row">
+                <td>
+                  <div class="strong">{{ item.productName }}</div>
+                  <div class="cell-sub">Product #{{ item.productId }}</div>
+                </td>
+                <td class="num">{{ item.unitPrice | number: '1.2-2' }}</td>
+                <td class="num">{{ item.quantity }}</td>
+                <td class="num">{{ item.lineTotal | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="num strong">Total</td>
+              <td class="num strong" data-testid="order-total">{{ o.totalAmount | number: '1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="detail-side">
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Payment</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <dl class="facts">
+            <dt>Status</dt>
+            <dd><span [class]="paymentChip(payment())" data-testid="payment-state">{{ paymentLabels[payment()] }}</span></dd>
+            <dt>Amount</dt>
+            <dd>{{ o.totalAmount | number: '1.2-2' }}</dd>
+            @if (o.paymentReference) {
+              <dt>Reference</dt>
+              <dd class="mono small">{{ o.paymentReference }}</dd>
+            }
+            @if (o.paidAt) {
+              <dt>Paid</dt>
+              <dd>{{ o.paidAt | date: 'medium' }}</dd>
+            }
+            @if (o.paymentFailedAt) {
+              <dt>Failed</dt>
+              <dd>{{ o.paymentFailedAt | date: 'medium' }}</dd>
+            }
+            @if (o.paymentFailureReason) {
+              <dt>Reason</dt>
+              <dd>{{ o.paymentFailureReason }}</dd>
+            }
+          </dl>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Shipment</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          @if (shipment(); as s) {
+            <dl class="facts">
+              <dt>Status</dt>
+              <dd><span [class]="shipmentChip(s.status)" data-testid="shipment-status">{{ shipmentLabels[s.status] }}</span></dd>
+            </dl>
+          } @else if (!shipmentAvailable()) {
+            <p class="muted">Shipment details are unavailable right now (shipping-service didn't respond).</p>
+          } @else if (awaitingShipment()) {
+            <p class="muted">Paid — waiting for shipping-service to create the shipment. Refresh in a moment.</p>
+          } @else {
+            <p class="muted" data-testid="no-shipment">No shipment for this order.</p>
+          }
+
+          @if (trackingNumber(); as tracking) {
+            <dl class="facts">
+              <dt>Carrier</dt>
+              <dd>{{ carrier() ?? '—' }}</dd>
+              <dt>Tracking</dt>
+              <dd class="tracking">
+                <span class="mono" data-testid="tracking-number">{{ tracking }}</span>
+                <button mat-icon-button type="button" [cdkCopyToClipboard]="tracking" matTooltip="Copy tracking number" aria-label="Copy tracking number">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </dd>
+            </dl>
+          }
+
+          <dl class="facts">
+            @if (shipment()?.shippedAt ?? o.shippedAt; as shippedAt) {
+              <dt>Shipped</dt>
+              <dd>{{ shippedAt | date: 'medium' }}</dd>
+            }
+            @if (shipment()?.deliveredAt ?? o.deliveredAt; as deliveredAt) {
+              <dt>Delivered</dt>
+              <dd>{{ deliveredAt | date: 'medium' }}</dd>
+            }
+          </dl>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Ship to</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          @if (o.shippingAddress; as a) {
+            <address class="address">
+              <span class="strong">{{ a.recipientName }}</span><br />
+              {{ a.line1 }}<br />
+              @if (a.line2) {
+                {{ a.line2 }}<br />
+              }
+              {{ a.city }}{{ a.state ? ', ' + a.state : '' }} {{ a.postalCode }}<br />
+              {{ a.country }}
+              @if (a.phone) {
+                <br /><span class="muted">{{ a.phone }}</span>
+              }
+            </address>
+          } @else {
+            <p class="muted">No shipping address on this order.</p>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      @if (o.status === 'CANCELLED') {
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Cancellation</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <dl class="facts">
+              <dt>When</dt>
+              <dd>{{ o.cancelledAt | date: 'medium' }}</dd>
+              <dt>Reason</dt>
+              <dd>{{ o.cancellationReason ?? '—' }}</dd>
+            </dl>
+            @if (o.cancellationDescription) {
+              <p class="muted small">{{ o.cancellationDescription }}</p>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  </div>
+}

@@ -233,3 +233,221 @@ body {
 .snack-error {
   --mdc-snackbar-container-color: #8a1c1c;
 }
+
+/* ---------- status chips & order detail (US45) ---------- */
+
+.chip--info {
+  background: #e3ecfd;
+  color: #1a3d8f;
+}
+
+.chip--accent {
+  background: #efe6fb;
+  color: #5b2b93;
+}
+
+.chip--muted {
+  background: #f1f1f4;
+  color: #6b6e76;
+}
+
+.mono {
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  mat-form-field {
+    width: 140px;
+  }
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  .chip {
+    line-height: 20px;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-progress {
+  margin-bottom: 12px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+
+  th,
+  td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #eceef3;
+    text-align: left;
+    font-size: 14px;
+  }
+
+  th {
+    font-weight: 500;
+    color: #5f6368;
+    font-size: 13px;
+  }
+
+  .num {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  tfoot td {
+    border-bottom: none;
+    font-size: 15px;
+  }
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  row-gap: 8px;
+  column-gap: 12px;
+  margin: 8px 0 0;
+
+  dt {
+    color: #5f6368;
+    font-size: 13px;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.tracking {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: -8px !important;
+  margin-bottom: -8px !important;
+}
+
+.address {
+  font-style: normal;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+/* ---------- dashboards (US46) ---------- */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e3e5ec;
+  border-radius: 12px;
+}
+
+.stat__label {
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.stat__value {
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__hint {
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.stat--warn {
+  border-color: #f2b8b5;
+  background: #fff8f7;
+
+  .stat__value {
+    color: #8a1c1c;
+  }
+}
+
+.tab-body {
+  padding-top: 16px;
+}
+
+.footnote {
+  margin-top: 8px;
+}
+
+.filters--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.chip-count {
+  margin-left: 4px;
+  color: #5f6368;
+  font-variant-numeric: tabular-nums;
+}
+
+.clickable-row {
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: #f6f7fb;
+  }
+}
+
+.failure-text {
+  color: #8a1c1c;
+}
+
+.cell-sub.wrap {
+  white-space: normal;
+  max-width: 320px;
+}

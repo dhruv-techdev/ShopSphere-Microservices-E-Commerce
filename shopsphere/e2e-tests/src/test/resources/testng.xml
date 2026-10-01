@@ -1,0 +1,11 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<!-- Each class gets its own thread and browser; methods inside a class run sequentially. -->
+<suite name="ShopSphere admin console E2E" parallel="classes" thread-count="2" verbose="2">
+    <test name="Admin console">
+        <classes>
+            <class name="com.shopsphere.e2e.tests.LoginE2ETest"/>
+            <class name="com.shopsphere.e2e.tests.ProductCrudE2ETest"/>
+            <class name="com.shopsphere.e2e.tests.OrderLifecycleE2ETest"/>
+        </classes>
+    </test>
+</suite>

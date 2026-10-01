@@ -1,0 +1,183 @@
+<header class="page-header">
+  <div>
+    <h1>Payments</h1>
+    <p class="muted">Captured money vs. order state, and anything that needs a human</p>
+  </div>
+  <div class="header-actions">
+    <mat-button-toggle-group [value]="period()" (change)="setPeriod($event.value)" aria-label="Summary period" hideSingleSelectionIndicator>
+      @for (p of periods; track p) {
+        <mat-button-toggle [value]="p">{{ periodLabels[p] }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+    <button mat-icon-button type="button" (click)="refresh()" aria-label="Refresh">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </div>
+</header>
+
+@if (summaryError()) {
+  <div class="banner banner--error" role="alert" data-testid="summary-error">{{ summaryError() }}</div>
+}
+
+<section class="stat-row">
+  <div class="stat" data-testid="stat-captured">
+    <span class="stat__label">Captured</span>
+    <span class="stat__value">{{ captured().amount | number: '1.2-2' }}</span>
+    <span class="stat__hint">{{ captured().count }} payments</span>
+  </div>
+  <div class="stat" [class.stat--warn]="failed().count > 0" data-testid="stat-failed">
+    <span class="stat__label">Failed</span>
+    <span class="stat__value">{{ failed().count }}</span>
+    <span class="stat__hint">{{ failed().amount | number: '1.2-2' }} declined</span>
+  </div>
+  <div class="stat">
+    <span class="stat__label">Success rate</span>
+    <span class="stat__value">{{ summary()?.successRate != null ? (summary()!.successRate! | percent: '1.0-1') : '—' }}</span>
+    <span class="stat__hint">{{ pending().count }} pending</span>
+  </div>
+  <div class="stat" [class.stat--warn]="(summary()?.duplicateChargeOrders ?? 0) > 0" data-testid="stat-duplicates">
+    <span class="stat__label">Charged twice</span>
+    <span class="stat__value">{{ summary()?.duplicateChargeOrders ?? 0 }}</span>
+    <span class="stat__hint">orders, all time</span>
+  </div>
+</section>
+
+<mat-tab-group animationDuration="0ms" mat-stretch-tabs="false">
+  <mat-tab [label]="'Needs attention (' + issues().length + ')'">
+    <div class="tab-body">
+      @if (issuesError()) {
+        <div class="banner banner--info" role="status" data-testid="issues-error">{{ issuesError() }}</div>
+      }
+      <section class="table-card">
+        @if (issuesLoading()) {
+          <mat-progress-bar mode="indeterminate" />
+        }
+        <div class="table-scroll">
+          <table mat-table [dataSource]="issues()">
+            <ng-container matColumnDef="kind">
+              <th mat-header-cell *matHeaderCellDef>Issue</th>
+              <td mat-cell *matCellDef="let item">
+                <span class="chip" [class.chip--warn]="item.kind !== 'PAYMENT_OVERDUE'">{{ issueLabel(item.kind).title }}</span>
+                <div class="cell-sub wrap">{{ issueLabel(item.kind).action }}</div>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="orderId">
+              <th mat-header-cell *matHeaderCellDef>Order</th>
+              <td mat-cell *matCellDef="let item"><a class="cell-link" [routerLink]="['/orders', item.orderId]">#{{ item.orderId }}</a></td>
+            </ng-container>
+            <ng-container matColumnDef="userId">
+              <th mat-header-cell *matHeaderCellDef>Customer</th>
+              <td mat-cell *matCellDef="let item">#{{ item.userId }}</td>
+            </ng-container>
+            <ng-container matColumnDef="amount">
+              <th mat-header-cell *matHeaderCellDef class="num">Amount</th>
+              <td mat-cell *matCellDef="let item" class="num">{{ item.amount | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="references">
+              <th mat-header-cell *matHeaderCellDef>Payment refs</th>
+              <td mat-cell *matCellDef="let item">
+                @for (ref of item.references; track ref) {
+                  <div class="mono small">{{ ref }}</div>
+                } @empty {
+                  <span class="muted">—</span>
+                }
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="since">
+              <th mat-header-cell *matHeaderCellDef>Since</th>
+              <td mat-cell *matCellDef="let item">{{ item.since | date: 'medium' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="issueColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: issueColumns" data-testid="issue-row"></tr>
+            <tr class="mat-mdc-row" *matNoDataRow>
+              <td class="mat-mdc-cell empty" [attr.colspan]="issueColumns.length">
+                {{ issuesLoading() ? 'Checking…' : 'Payments and orders agree. Nothing needs attention.' }}
+              </td>
+            </tr>
+          </table>
+        </div>
+      </section>
+      <p class="muted small footnote">
+        Checks: orders cancelled or failed after a capture, orders awaiting payment for more than {{ overdueMinutes }} minutes,
+        and orders captured more than once.
+      </p>
+    </div>
+  </mat-tab>
+
+  <mat-tab label="All payments">
+    <div class="tab-body">
+      <form class="filters" [formGroup]="filters" novalidate>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status">
+            <mat-option [value]="null">Any status</mat-option>
+            @for (s of statuses; track s) {
+              <mat-option [value]="s">{{ s }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="filters__price" subscriptSizing="dynamic">
+          <mat-label>Order #</mat-label>
+          <input matInput type="number" min="1" formControlName="orderId" data-testid="payment-order-filter" />
+        </mat-form-field>
+      </form>
+
+      @if (paymentsError()) {
+        <div class="banner banner--error" role="alert" data-testid="payments-error">{{ paymentsError() }}</div>
+      }
+
+      <section class="table-card">
+        @if (paymentsLoading()) {
+          <mat-progress-bar mode="indeterminate" />
+        }
+        <div class="table-scroll">
+          <table mat-table [dataSource]="payments().content">
+            <ng-container matColumnDef="createdAt">
+              <th mat-header-cell *matHeaderCellDef>When</th>
+              <td mat-cell *matCellDef="let p">{{ p.createdAt | date: 'medium' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="paymentReference">
+              <th mat-header-cell *matHeaderCellDef>Reference</th>
+              <td mat-cell *matCellDef="let p" class="mono small">{{ p.paymentReference }}</td>
+            </ng-container>
+            <ng-container matColumnDef="orderId">
+              <th mat-header-cell *matHeaderCellDef>Order</th>
+              <td mat-cell *matCellDef="let p"><a class="cell-link" [routerLink]="['/orders', p.orderId]">#{{ p.orderId }}</a></td>
+            </ng-container>
+            <ng-container matColumnDef="userId">
+              <th mat-header-cell *matHeaderCellDef>Customer</th>
+              <td mat-cell *matCellDef="let p">#{{ p.userId }}</td>
+            </ng-container>
+            <ng-container matColumnDef="amount">
+              <th mat-header-cell *matHeaderCellDef class="num">Amount</th>
+              <td mat-cell *matCellDef="let p" class="num">{{ p.amount | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef>Status</th>
+              <td mat-cell *matCellDef="let p"><span [class]="statusChip(p.status)">{{ p.status }}</span></td>
+            </ng-container>
+            <ng-container matColumnDef="message">
+              <th mat-header-cell *matHeaderCellDef>Message</th>
+              <td mat-cell *matCellDef="let p" class="cell-sub">{{ p.message ?? '—' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="paymentColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: paymentColumns" data-testid="payment-row"></tr>
+            <tr class="mat-mdc-row" *matNoDataRow>
+              <td class="mat-mdc-cell empty" [attr.colspan]="paymentColumns.length">
+                {{ paymentsLoading() ? 'Loading…' : 'No payments match these filters.' }}
+              </td>
+            </tr>
+          </table>
+        </div>
+        <mat-paginator
+          [length]="payments().totalElements"
+          [pageIndex]="payments().page"
+          [pageSize]="payments().size || 20"
+          [pageSizeOptions]="[20, 50, 100]"
+          (page)="onPage($event)"
+          aria-label="Payment pages"
+        />
+      </section>
+    </div>
+  </mat-tab>
+</mat-tab-group>

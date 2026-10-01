@@ -1,0 +1,17 @@
+# US47 — deterministic settings for the Selenium E2E suite:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
+services:
+  user-service:
+    environment:
+      # The suite registers throwaway accounts and signs in straight away.
+      AUTH_REQUIRE_VERIFIED_EMAIL: "false"
+
+  payment-service:
+    environment:
+      # Every order gets paid, so the order lifecycle is deterministic.
+      PAYMENT_SUCCESS_RATE: "1.0"
+
+  shipping-service:
+    environment:
+      # Admins dispatch from the UI under test.
+      Shipping__AutoDispatch: "false"

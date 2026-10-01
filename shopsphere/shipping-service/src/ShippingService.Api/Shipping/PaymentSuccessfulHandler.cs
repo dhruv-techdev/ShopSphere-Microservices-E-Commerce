@@ -11,7 +11,11 @@ using ShippingService.Api.Tracking;
 namespace ShippingService.Api.Shipping;
 
 /// <summary>
-/// payment.successful → shipment (SHIPPED, with tracking number) → shipment.dispatched.
+/// payment.successful → shipment.
+///  - Shipping:AutoDispatch = false (default, US45): the shipment is created PENDING and an admin
+///    dispatches it via POST /api/v1/shipments/{id}/ship.
+///  - Shipping:AutoDispatch = true: the shipment is SHIPPED immediately with a generated tracking
+///    number and shipment.dispatched is published (pre-US45 behaviour).
 ///
 /// Idempotency:
 ///  1. processed_events has one row per consumed eventId, saved in the SAME SaveChanges
@@ -67,9 +71,13 @@ public sealed class PaymentSuccessfulHandler(
             return HandleOutcome.SkippedNoAddress;
         }
 
-        // 4. Create + dispatch.
+        // 4. Create (and, with AutoDispatch, dispatch straight away).
+        var autoDispatch = shippingOptions.Value.AutoDispatch;
         var shipment = Shipment.Create(evt.OrderId, evt.UserId, address);
-        shipment.MarkShipped(shippingOptions.Value.DefaultCarrier, trackingNumbers.Next(), now);
+        if (autoDispatch)
+        {
+            shipment.MarkShipped(shippingOptions.Value.DefaultCarrier, trackingNumbers.Next(), now);
+        }
 
         db.Shipments.Add(shipment);
         db.ProcessedEvents.Add(processed);
@@ -79,6 +87,13 @@ public sealed class PaymentSuccessfulHandler(
             // Lost a race with a concurrent delivery of the same event/order.
             await EnsureDispatchPublishedAsync(evt.OrderId, ct);
             return HandleOutcome.Duplicate;
+        }
+
+        if (!autoDispatch)
+        {
+            logger.LogInformation("Created PENDING shipment {ShipmentId} for orderId={OrderId}; awaiting dispatch by an admin",
+                shipment.Id, shipment.OrderId);
+            return HandleOutcome.Created;
         }
 
         logger.LogInformation("Created shipment {ShipmentId} for orderId={OrderId} carrier={Carrier} tracking={TrackingNumber}",

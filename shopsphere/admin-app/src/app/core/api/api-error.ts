@@ -10,14 +10,19 @@ export function apiErrorBody(err: unknown): ApiError | null {
   return null;
 }
 
-/** Field -> message map from a 400 ApiError (`fieldErrors`), or {} when absent. */
+/**
+ * Field -> message map from a 400 response, or {} when absent. Understands both the Java
+ * ApiError (`fieldErrors: {field: message}`) and .NET ValidationProblem (`errors: {field: [messages]}`).
+ */
 export function fieldErrorsOf(err: unknown): Record<string, string> {
-  const raw = apiErrorBody(err)?.fieldErrors;
+  const body = apiErrorBody(err);
+  const raw = body?.fieldErrors ?? body?.errors;
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     return {};
   }
   const result: Record<string, string> = {};
-  for (const [field, message] of Object.entries(raw as Record<string, unknown>)) {
+  for (const [field, value] of Object.entries(raw as Record<string, unknown>)) {
+    const message = Array.isArray(value) ? value.find((v) => typeof v === 'string') : value;
     if (typeof message === 'string') {
       result[field] = message;
     }
@@ -45,7 +50,8 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   if (err.status === 400 && Object.keys(fieldErrorsOf(err)).length > 0) {
     return 'Please fix the highlighted fields.';
   }
-  return apiErrorBody(err)?.message || fallback;
+  const body = apiErrorBody(err);
+  return body?.message || body?.detail || fallback;
 }
 
 /**

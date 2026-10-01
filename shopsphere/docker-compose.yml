@@ -44,6 +44,19 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: shopsphere-kafka
+    # ZooKeeper keeps its data across restarts, so after an unclean Kafka stop the old
+    # /brokers/ids/1 registration lingers until its session expires (~18s) and a fresh
+    # broker dies with NodeExistsException. Wait for it to clear, then start normally.
+    command:
+      - bash
+      - -c
+      - |
+        while timeout 10 zookeeper-shell zookeeper:2181 get /brokers/ids/1 2>/dev/null | grep -q '"host"'; do
+          echo "Waiting for stale broker registration in ZooKeeper to expire..."
+          sleep 3
+        done
+        exec /etc/confluent/docker/run
+    restart: on-failure
     depends_on:
       - zookeeper
     ports:
@@ -293,6 +306,8 @@ services:
       spring__cloud__config__uri: http://config-service:8888
       eureka__client__serviceUrl: http://service-registry:8761/eureka/
       eureka__instance__hostName: shipping-service
+      # US45 — false: admins dispatch shipments from the admin app; true: ship on payment (old behaviour)
+      Shipping__AutoDispatch: ${SHIPPING_AUTO_DISPATCH:-false}
     depends_on:
       postgres:
         condition: service_healthy

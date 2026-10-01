@@ -6,6 +6,7 @@ import com.shopsphere.notificationservice.entity.NotificationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +16,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Repository
-public interface NotificationRepository extends JpaRepository<Notification, Long> {
+public interface NotificationRepository extends JpaRepository<Notification, Long>, JpaSpecificationExecutor<Notification> {
 
     boolean existsBySourceEventId(String sourceEventId);
 
@@ -53,4 +54,28 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
               @Param("status") DeliveryStatus status,
               @Param("expected") Instant expected,
               @Param("leaseUntil") Instant leaseUntil);
+
+    /* ---------------- US46 — admin log ---------------- */
+
+    @Query("SELECT n.deliveryStatus AS status, COUNT(n) AS total FROM Notification n GROUP BY n.deliveryStatus")
+    List<StatusTotal> statusTotals();
+
+    /**
+     * Compare-and-set requeue: moves a notification from {@code from} back into the retry queue,
+     * due at {@code dueAt}. Returns 0 if its status changed in the meantime.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            UPDATE Notification n SET n.deliveryStatus = :to, n.nextAttemptAt = :dueAt
+            WHERE n.id = :id AND n.deliveryStatus = :from
+            """)
+    int requeue(@Param("id") Long id,
+                @Param("from") DeliveryStatus from,
+                @Param("to") DeliveryStatus to,
+                @Param("dueAt") Instant dueAt);
+
+    interface StatusTotal {
+        DeliveryStatus getStatus();
+        Long getTotal();
+    }
 }

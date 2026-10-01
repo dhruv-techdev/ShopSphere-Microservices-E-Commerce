@@ -2,6 +2,7 @@ package com.shopsphere.orderservice.controller;
 
 import com.shopsphere.orderservice.dto.AdminOrderSummaryResponse;
 import com.shopsphere.orderservice.dto.OrderResponse;
+import com.shopsphere.orderservice.dto.PaymentIssueResponse;
 import com.shopsphere.orderservice.entity.OrderStatus;
 import com.shopsphere.orderservice.exception.ApiError;
 import com.shopsphere.orderservice.service.AdminOrderService;
@@ -28,6 +29,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
+import java.util.List;
+
 /** US42 — ADMIN-only order management (every endpoint, enforced here and at the gateway). */
 @RestController
 @RequestMapping("/api/v1/admin/orders")
@@ -40,6 +44,8 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class AdminOrderController {
 
+    private static final int MAX_OVERDUE_MINUTES = 7 * 24 * 60;
+
     private final AdminOrderService adminOrderService;
 
     @GetMapping
@@ -49,6 +55,17 @@ public class AdminOrderController {
             @Parameter(description = "Filter by customer id") @RequestParam(required = false) Long userId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return adminOrderService.search(status, userId, pageable);
+    }
+
+    /** US46 — declared before /{orderId}; the literal path wins either way. */
+    @GetMapping("/reconciliation")
+    @Operation(summary = "Orders whose status and payment disagree",
+            description = "Cancelled-but-paid, failed-but-later-paid, and orders awaiting payment for too long.")
+    public List<PaymentIssueResponse> reconciliation(
+            @Parameter(description = "Minutes after which PENDING_PAYMENT counts as overdue (1–10080)")
+            @RequestParam(defaultValue = "30") int pendingOlderThanMinutes) {
+        int minutes = Math.max(1, Math.min(pendingOlderThanMinutes, MAX_OVERDUE_MINUTES));
+        return adminOrderService.reconciliation(Duration.ofMinutes(minutes));
     }
 
     @GetMapping("/{orderId}")
