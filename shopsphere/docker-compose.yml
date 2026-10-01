@@ -68,6 +68,10 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Must match the partition count services declare (KafkaTopicConfig: 3). Otherwise a consumer that
+      # starts first auto-creates a 1-partition topic, the declaring service later grows it to 3, and the
+      # consumer ignores the new partitions until its next metadata refresh (5 min) — events are missed.
+      KAFKA_NUM_PARTITIONS: 3
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
       interval: 15s
