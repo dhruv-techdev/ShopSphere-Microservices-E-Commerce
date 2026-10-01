@@ -320,6 +320,29 @@ services:
       service-registry:
         condition: service_healthy
 
+  # US63 — co-purchase recommendations (Python 3.12 / FastAPI). Docs: http://localhost:8089/api/v1/recommendations/docs
+  recommendation-service:
+    build:
+      context: ./recommendation-service
+      dockerfile: Dockerfile
+    container_name: shopsphere-recommendation
+    ports:
+      - "8089:8089"
+    environment:
+      DATABASE_URL: postgresql+psycopg://shopsphere:shopsphere@postgres:5432/shopsphere
+      ORDERS_SCHEMA: shopsphere_orders
+      EUREKA_SERVER: http://service-registry:8761/eureka/
+      INSTANCE_HOST: recommendation-service
+      REFRESH_INTERVAL_MINUTES: ${RECOMMENDATION_REFRESH_MINUTES:-15}
+      LOOKBACK_DAYS: ${RECOMMENDATION_LOOKBACK_DAYS:-365}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+      order-service:
+        condition: service_started   # its Flyway migrations own the tables we read
+
   api-gateway:
     build:
       context: .
