@@ -18,6 +18,11 @@ spring:
           uri: ${USER_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/v1/users/**
+        # US46 — admin user list
+        - id: user-service-admin
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/admin/users/**
 
         # ---------- Product Service ----------
         - id: product-service-products
@@ -40,7 +45,7 @@ spring:
           uri: ${ORDER_SERVICE_URL:http://localhost:8084}
           predicates:
             - Path=/api/v1/orders/**
-        # US42 — admin order management
+        # US42 — admin order management (US46: + /reconciliation)
         - id: order-service-admin
           uri: ${ORDER_SERVICE_URL:http://localhost:8084}
           predicates:
@@ -57,12 +62,22 @@ spring:
           uri: ${PAYMENT_SERVICE_URL:http://localhost:8086}
           predicates:
             - Path=/api/v1/payments/**
+        # US46 — admin payment reconciliation
+        - id: payment-service-admin
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/admin/payments/**
 
         # ---------- Notification Service ----------
         - id: notification-service
           uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8087}
           predicates:
             - Path=/api/v1/notifications/**
+        # US46 — admin notification log
+        - id: notification-service-admin
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8087}
+          predicates:
+            - Path=/api/v1/admin/notifications/**
 
         # ---------- Shipping Service (.NET 8 + Steeltoe) ----------
         - id: shipping-service

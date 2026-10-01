@@ -246,6 +246,11 @@ public class OrderService {
                 .cancellationDescription(order.getCancellationReason() == null
                         ? null : order.getCancellationReason().getDescription())
                 .cancelledAt(order.getCancelledAt())
+                .paymentState(order.paymentState())
+                .paymentReference(order.getPaymentReference())
+                .paidAt(order.getPaidAt())
+                .paymentFailedAt(order.getPaymentFailedAt())
+                .paymentFailureReason(order.getPaymentFailureReason())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .items(order.getItems().stream()

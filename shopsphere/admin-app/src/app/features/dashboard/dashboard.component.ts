@@ -53,10 +53,12 @@ export class DashboardComponent {
   protected readonly auth = inject(AuthService);
 
   readonly tiles: Tile[] = [
+    { icon: 'receipt_long', title: 'Orders', description: 'Filter orders, ship, deliver or cancel them.', link: '/orders' },
     { icon: 'inventory_2', title: 'Products', description: 'Search, create, edit and delete catalog products.', link: '/products' },
     { icon: 'category', title: 'Categories', description: 'Organise the catalog into categories.', link: '/categories' },
-    { icon: 'receipt_long', title: 'Orders', description: 'Search, inspect and cancel customer orders.' },
-    { icon: 'warehouse', title: 'Inventory', description: 'Adjust stock levels and watch low-stock alerts.' },
-    { icon: 'local_shipping', title: 'Shipments', description: 'Track, deliver or cancel shipments.' },
+    { icon: 'warning_amber', title: 'Low stock', description: 'Products running out, with one-click restock.', link: '/inventory/low-stock' },
+    { icon: 'payments', title: 'Payments', description: 'Captured money, failures and reconciliation issues.', link: '/payments' },
+    { icon: 'group', title: 'Users', description: 'Customer and admin accounts.', link: '/users' },
+    { icon: 'mail', title: 'Notifications', description: 'Every email sent, failed or retried.', link: '/notifications' },
   ];
 }

@@ -112,8 +112,13 @@ export class ShellComponent {
 
   readonly navItems: NavItem[] = [
     { path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { path: '/orders', icon: 'receipt_long', label: 'Orders' },
     { path: '/products', icon: 'inventory_2', label: 'Products' },
     { path: '/categories', icon: 'category', label: 'Categories' },
+    { path: '/inventory/low-stock', icon: 'warning_amber', label: 'Low stock' },
+    { path: '/payments', icon: 'payments', label: 'Payments' },
+    { path: '/users', icon: 'group', label: 'Users' },
+    { path: '/notifications', icon: 'mail', label: 'Notifications' },
   ];
 
   logout(): void {

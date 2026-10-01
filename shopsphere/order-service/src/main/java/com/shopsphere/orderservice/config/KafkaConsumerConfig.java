@@ -1,5 +1,7 @@
 package com.shopsphere.orderservice.config;
 
+import com.shopsphere.common.events.PaymentFailedEvent;
+import com.shopsphere.common.events.PaymentSuccessfulEvent;
 import com.shopsphere.common.events.ReservationExpiredEvent;
 import com.shopsphere.common.events.ShipmentDeliveredEvent;
 import com.shopsphere.common.events.ShipmentDispatchedEvent;
@@ -18,7 +20,10 @@ import org.springframework.kafka.support.serializer.JsonDeserializer;
 import java.util.HashMap;
 import java.util.Map;
 
-/** order-service consumers: shipment events (US36) and reservation expiry (US38). */
+/**
+ * order-service consumers: shipment events (US36), reservation expiry (US38)
+ * and payment outcomes (US45).
+ */
 @Configuration
 @EnableKafka
 public class KafkaConsumerConfig {
@@ -65,5 +70,17 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, ReservationExpiredEvent>
             reservationExpiredListenerContainerFactory() {
         return factory(ReservationExpiredEvent.class);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentSuccessfulEvent>
+            paymentSuccessfulListenerContainerFactory() {
+        return factory(PaymentSuccessfulEvent.class);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent>
+            paymentFailedListenerContainerFactory() {
+        return factory(PaymentFailedEvent.class);
     }
 }

@@ -73,6 +73,12 @@
             <artifactId>common-lib</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- US46: JWT auth + @PreAuthorize for admin endpoints -->
+        <dependency>
+            <groupId>com.shopsphere</groupId>
+            <artifactId>security-lib</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>

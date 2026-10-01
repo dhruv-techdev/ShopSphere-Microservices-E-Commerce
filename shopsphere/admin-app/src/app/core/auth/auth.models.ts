@@ -23,7 +23,10 @@ export interface AuthResponse {
   message?: string;
 }
 
-/** Mirrors the backend ApiError body. */
+/**
+ * Mirrors the Java services' ApiError body. The .NET shipping-service returns RFC 7807
+ * ProblemDetails instead (title/detail, and `errors` for validation failures).
+ */
 export interface ApiError {
   timestamp?: string;
   status?: number;
@@ -31,6 +34,9 @@ export interface ApiError {
   message?: string;
   path?: string;
   fieldErrors?: unknown;
+  title?: string;
+  detail?: string;
+  errors?: unknown;
 }
 
 export interface AuthUser {

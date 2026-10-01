@@ -1,0 +1,126 @@
+<header class="page-header">
+  <div>
+    <h1>Orders</h1>
+    <p class="muted">{{ page().totalElements }} {{ page().totalElements === 1 ? 'order' : 'orders' }}</p>
+  </div>
+  <!-- Plain (submit), not (ngSubmit): this form has no [formGroup], so no NgForm directive emits ngSubmit
+       and the browser would do a native submit (full reload of /orders) instead. -->
+  <form class="jump" (submit)="$event.preventDefault(); openOrder()" novalidate>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Order #</mat-label>
+      <input matInput type="number" min="1" [formControl]="jump" data-testid="jump" />
+    </mat-form-field>
+    <button mat-stroked-button type="submit">Open</button>
+  </form>
+</header>
+
+<form class="filters" [formGroup]="filters" novalidate>
+  <mat-chip-listbox formControlName="status" aria-label="Filter by status" [hideSingleSelectionIndicator]="true">
+    <mat-chip-option [value]="all">All</mat-chip-option>
+    @for (status of statuses; track status) {
+      <mat-chip-option [value]="status">{{ statusLabel(status) }}</mat-chip-option>
+    }
+  </mat-chip-listbox>
+
+  <mat-form-field appearance="outline" class="filters__price" subscriptSizing="dynamic">
+    <mat-label>Customer ID</mat-label>
+    <input matInput type="number" min="1" formControlName="userId" data-testid="user-filter" />
+  </mat-form-field>
+
+  <button mat-button type="button" (click)="clearFilters()" [disabled]="!hasFilters()">Clear filters</button>
+</form>
+
+@if (error()) {
+  <div class="banner banner--error" role="alert" data-testid="list-error">
+    <span>{{ error() }}</span>
+    <button mat-button type="button" (click)="reload()">Retry</button>
+  </div>
+}
+
+<section class="table-card">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <div class="table-scroll">
+    <table
+      mat-table
+      [dataSource]="page().content"
+      matSort
+      matSortDisableClear
+      [matSortActive]="query().sort.field"
+      [matSortDirection]="query().sort.direction"
+      (matSortChange)="onSortChange($event)"
+    >
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Order</th>
+        <td mat-cell *matCellDef="let order">
+          <a class="cell-link" [routerLink]="['/orders', order.id]">#{{ order.id }}</a>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="userId">
+        <th mat-header-cell *matHeaderCellDef>Customer</th>
+        <td mat-cell *matCellDef="let order">#{{ order.userId }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+        <td mat-cell *matCellDef="let order">
+          <span [class]="statusChip(order.status)">{{ statusLabel(order.status) }}</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="payment">
+        <th mat-header-cell *matHeaderCellDef>Payment</th>
+        <td mat-cell *matCellDef="let order">
+          <span [class]="paymentChip(paymentOf(order))">{{ paymentLabels[paymentOf(order)] }}</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="itemCount">
+        <th mat-header-cell *matHeaderCellDef class="num">Items</th>
+        <td mat-cell *matCellDef="let order" class="num">{{ order.itemCount }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="totalAmount">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before" class="num">Total</th>
+        <td mat-cell *matCellDef="let order" class="num">{{ order.totalAmount | number: '1.2-2' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="trackingNumber">
+        <th mat-header-cell *matHeaderCellDef>Tracking</th>
+        <td mat-cell *matCellDef="let order">
+          @if (order.trackingNumber) {
+            <span class="mono">{{ order.trackingNumber }}</span>
+          } @else {
+            <span class="muted">—</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="createdAt">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Placed</th>
+        <td mat-cell *matCellDef="let order">{{ order.createdAt | date: 'medium' }}</td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns" data-testid="order-row"></tr>
+      <tr class="mat-mdc-row" *matNoDataRow>
+        <td class="mat-mdc-cell empty" [attr.colspan]="columns.length">
+          {{ loading() ? 'Loading…' : hasFilters() ? 'No orders match these filters.' : 'No orders yet.' }}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <mat-paginator
+    [length]="page().totalElements"
+    [pageIndex]="page().page"
+    [pageSize]="query().size"
+    [pageSizeOptions]="pageSizeOptions"
+    showFirstLastButtons
+    (page)="onPage($event)"
+    aria-label="Order pages"
+  />
+</section>

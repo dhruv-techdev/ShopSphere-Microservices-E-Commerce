@@ -5,11 +5,9 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 COPY pom.xml /workspace/pom.xml
 RUN mvn -N -f /workspace/pom.xml install
 
-# Layer 2: common-lib — install into local repo
+# Layer 2: shared libraries — install into local repo
 COPY common-lib /workspace/common-lib
 RUN mvn -f /workspace/common-lib/pom.xml install -DskipTests
-
-# Layer 2b: security-lib (shared JWT auto-config) — needs common-lib + parent
 COPY security-lib /workspace/security-lib
 RUN mvn -f /workspace/security-lib/pom.xml install -DskipTests
 

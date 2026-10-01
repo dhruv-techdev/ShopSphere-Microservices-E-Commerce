@@ -31,6 +31,12 @@ describe('api-error helpers', () => {
       );
     });
 
+    it('reads ProblemDetails (detail) from the .NET shipping-service', () => {
+      expect(apiErrorMessage(httpError(409, { title: 'Conflict', detail: 'Shipment 5 is CANCELLED' }), 'x')).toBe(
+        'Shipment 5 is CANCELLED',
+      );
+    });
+
     it('falls back for non-HTTP errors', () => {
       expect(apiErrorMessage(new Error('boom'), 'fallback')).toBe('fallback');
     });
@@ -42,6 +48,11 @@ describe('api-error helpers', () => {
       expect(fieldErrorsOf(err)).toEqual({ name: 'Name is required' });
       expect(fieldErrorsOf(httpError(400, { fieldErrors: ['x'] }))).toEqual({});
       expect(fieldErrorsOf(httpError(400, 'plain text'))).toEqual({});
+    });
+
+    it('reads .NET ValidationProblem errors (first message per field)', () => {
+      const err = httpError(400, { errors: { trackingNumber: ['Too short', 'Bad chars'] } });
+      expect(fieldErrorsOf(err)).toEqual({ trackingNumber: 'Too short' });
     });
   });
 

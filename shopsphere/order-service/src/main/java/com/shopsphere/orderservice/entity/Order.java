@@ -89,6 +89,20 @@ public class Order {
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
+    /* ---------- US45: payment outcome, filled from payment-service events ---------- */
+
+    @Column(name = "payment_reference", length = 64)
+    private String paymentReference;
+
+    @Column(name = "paid_at")
+    private Instant paidAt;
+
+    @Column(name = "payment_failed_at")
+    private Instant paymentFailedAt;
+
+    @Column(name = "payment_failure_reason", length = 255)
+    private String paymentFailureReason;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
@@ -115,5 +129,21 @@ public class Order {
         this.status = OrderStatus.CANCELLED;
         this.cancellationReason = reason;
         this.cancelledAt = at;
+    }
+
+    /**
+     * US45 — payment outcome. Shipped/delivered orders were necessarily paid (a shipment only
+     * exists after payment.successful), which also covers orders from before payment tracking.
+     * Not a JavaBean getter on purpose, so JPA never treats it as a column.
+     */
+    public PaymentState paymentState() {
+        if (paidAt != null || status == OrderStatus.PAID
+                || status == OrderStatus.SHIPPED || status == OrderStatus.DELIVERED) {
+            return PaymentState.PAID;
+        }
+        if (paymentFailedAt != null || status == OrderStatus.PAYMENT_FAILED) {
+            return PaymentState.FAILED;
+        }
+        return PaymentState.PENDING;
     }
 }

@@ -27,6 +27,10 @@ public static class ShipmentEndpoints
             .WithName("GetShipmentByOrderId")
             .WithSummary("Get the shipment for an order (owner or ADMIN)");
 
+        group.MapPost("/{shipmentId:long}/ship", ShipAsync)
+            .WithName("ShipShipment")
+            .WithSummary("Dispatch a PENDING shipment (carrier + tracking number) and publish shipment.dispatched (ADMIN)");
+
         group.MapPost("/{shipmentId:long}/deliver", DeliverAsync)
             .WithName("DeliverShipment")
             .WithSummary("Mark a SHIPPED shipment as DELIVERED and publish shipment.delivered (ADMIN)");
@@ -65,6 +69,29 @@ public static class ShipmentEndpoints
     }
 
     /* --------------------------- transitions --------------------------- */
+
+    /// <summary>US45 — body is optional ({} or omitted fields use the defaults).</summary>
+    internal static async Task<IResult> ShipAsync(
+        long shipmentId,
+        [FromHeader(Name = "X-User-Role")] string? role,
+        [FromBody] ShipShipmentRequest? request,
+        ShipmentDispatchService dispatch,
+        CancellationToken ct)
+    {
+        if (!IsAdmin(role))
+        {
+            return Forbidden("ADMIN role required to change shipment status");
+        }
+
+        request ??= new ShipShipmentRequest(null, null);
+        var errors = request.Validate();
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return ToTransitionResult(await dispatch.ShipAsync(shipmentId, request.Carrier, request.TrackingNumber, ct));
+    }
 
     internal static async Task<IResult> DeliverAsync(
         long shipmentId,
