@@ -154,10 +154,11 @@ public final class Ui {
     /**
      * Replaces the field's content with key events so Angular's reactive forms see real input events
      * ({@code WebElement.clear()} does not fire {@code input}).
+     * No click first: sendKeys focuses the element itself, while a mouse click on an empty Material
+     * field lands on the floating {@code <mat-label>} overlaying it (ElementClickInterceptedException).
      */
     public void type(By locator, String text) {
         WebElement element = visible(locator);
-        element.click();
         element.sendKeys(Keys.chord(selectAllModifier(), "a"), Keys.DELETE);
         if (!text.isEmpty()) {
             element.sendKeys(text);

@@ -98,6 +98,18 @@ describe('OrderListComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/orders', 1234]);
   });
 
+  it('opens an order when the "Order #" form is submitted, without a native page submit', () => {
+    setup();
+    component.jump.setValue(77);
+
+    const form: HTMLFormElement = fixture.nativeElement.querySelector('form.jump');
+    const submit = new Event('submit', { cancelable: true });
+    form.dispatchEvent(submit);
+
+    expect(submit.defaultPrevented).toBeTrue();
+    expect(router.navigate).toHaveBeenCalledWith(['/orders', 77]);
+  });
+
   it('ignores an invalid order number', () => {
     setup();
 

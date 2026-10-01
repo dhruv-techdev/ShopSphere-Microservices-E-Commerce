@@ -3,7 +3,9 @@
     <h1>Orders</h1>
     <p class="muted">{{ page().totalElements }} {{ page().totalElements === 1 ? 'order' : 'orders' }}</p>
   </div>
-  <form class="jump" (ngSubmit)="openOrder()" novalidate>
+  <!-- Plain (submit), not (ngSubmit): this form has no [formGroup], so no NgForm directive emits ngSubmit
+       and the browser would do a native submit (full reload of /orders) instead. -->
+  <form class="jump" (submit)="$event.preventDefault(); openOrder()" novalidate>
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
       <mat-label>Order #</mat-label>
       <input matInput type="number" min="1" [formControl]="jump" data-testid="jump" />
